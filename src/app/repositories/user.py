@@ -1,0 +1,46 @@
+# src/app/repositories/user.py
+"""
+UserRepository — async DB access for the User model.
+
+Only DB queries live here. Business logic (e.g. password hashing,
+uniqueness error messaging) belongs in UserService / AuthService.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from sqlalchemy import select
+
+from app.models.user import User
+from app.repositories.base import BaseRepository
+
+if TYPE_CHECKING:
+    import uuid
+
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+
+class UserRepository(BaseRepository[User]):
+    """Async repository for the ``users`` table."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(User, session)
+
+    # ------------------------------------------------------------------
+    # Domain-specific lookups
+    # ------------------------------------------------------------------
+
+    async def get_by_email(self, email: str) -> User | None:
+        """Return the user with the given email, or ``None``."""
+        result = await self._session.scalars(select(User).where(User.email == email).limit(1))
+        return result.first()
+
+    async def get_by_id(self, pk: uuid.UUID) -> User | None:  # type: ignore[override]
+        """Override to narrow the ``pk`` type to ``uuid.UUID``."""
+        return await self._session.get(User, pk)
+
+    async def exists_by_email(self, email: str) -> bool:
+        """Return ``True`` if a user with this email already exists."""
+        result = await self._session.scalars(select(User.id).where(User.email == email).limit(1))
+        return result.first() is not None

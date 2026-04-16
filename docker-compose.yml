@@ -1,0 +1,72 @@
+# docker-compose.yml
+name: ams-project
+
+services:
+  # ---------------------------------------------------------------------------
+  # API / Application
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # In local compose, override production defaults to use local config
+      - ENVIRONMENT=local
+      - DEBUG=true
+      # Depend on other services
+      - DATABASE_URL=postgresql+asyncpg://ams_user:ams_pass@postgres:5432/ams_db
+      - REDIS_URL=redis://redis:6379/0
+      # Required secrets 
+      - SECRET_KEY=local-dev-secret-key-replace-in-prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ---------------------------------------------------------------------------
+  # Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=ams_user
+      - POSTGRES_PASSWORD=ams_pass
+      - POSTGRES_DB=ams_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ams_user -d ams_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Cache / Tokens / Queue
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:

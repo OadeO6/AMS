@@ -1,0 +1,74 @@
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    name: Lint, Typecheck, and Test
+    runs-on: ubuntu-latest
+    
+    # We mount PostgreSQL and Redis as service containers to support the integration tests.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Provide testing URL that matches the github service configuration
+      TEST_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+      REDIS_URL: redis://localhost:6379/0
+      ENVIRONMENT: local
+      SECRET_KEY: ci-test-secret-key-12345
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Setup Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lint (Ruff format)
+        run: uv run ruff format --check .
+
+      - name: Lint (Ruff lint)
+        run: uv run ruff check .
+
+      - name: Typecheck (Mypy)
+        run: uv run mypy .
+
+      - name: Test (Pytest with Coverage)
+        run: uv run pytest

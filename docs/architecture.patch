@@ -1,0 +1,128 @@
+--- a/ARCHITECTURE.md
++++ b/ARCHITECTURE.md
+@@ -1,8 +1,6 @@
+ # Architecture
+
+-> Defines the fundamental architecture, stack, and structure of the project.
+-> **How to update:** Update stack decisions as they are finalized. Keep reasoning brief.
+-> Large architectural decisions (e.g. AI pipeline, file storage strategy) should go in individual
+-> files under `/specs/arch/` and be referenced here.
++> Defines the fundamental architecture, stack, and live project structure.
++> Large architectural decisions (e.g. AI pipeline, file storage) should go in `/specs/arch/` and be referenced here.
+ ## Developer Instructions
+
+ > **How to update:** Update stack decisions as they are finalized. Keep reasoning brief.
+@@ -10,6 +8,7 @@
+ > files under `/specs/arch/` and be referenced here.
+ >
+ > **Keep in sync with:** `ENDPOINTS.md`, `DATABASE_SCHEMA.md`, `BUSINESS_RULES.md`, `DOC_HISTORY.md`
++> **Update the Folder Structure section** whenever a new module, layer, or significant directory is added.
+ > Whenever the architecture changes (new layer, new service, stack decision), log the change in `DOC_HISTORY.md`.
+
+ ---
+@@ -29,13 +28,13 @@
+
+ | Layer | Choice | Reason |
+ |---|---|---|
+-| Language | TBD | — |
+-| Framework | TBD | — |
+-| Database | TBD | — |
+-| ORM | TBD | — |
+-| Auth | JWT | Stateless, standard |
+-| File Storage | TBD | — |
+-| AI Provider | TBD | For tutoring + grading |
+-| Vector DB | TBD | For RAG/material indexing |
+-| Hosting | TBD | — |
++| Language | Python 3.12+ | — |
++| Framework | FastAPI 0.115+ (async-first) | Async-native, fast, excellent OpenAPI support |
++| ASGI Server | Uvicorn (dev) · Gunicorn + Uvicorn workers (prod) | Standard FastAPI deployment |
++| Database | PostgreSQL 16 | Relational, reliable, strong async support |
++| ORM | SQLAlchemy 2.x async + asyncpg | Async-first, type-safe with Mapped[] API |
++| Migrations | Alembic (autogenerate from ORM models) | Pairs with SQLAlchemy |
++| Cache / Sessions | Redis 7 via redis-py async | Refresh token storage, future caching |
++| Auth | JWT (access, 15 min) + opaque UUID in Redis (refresh, 7 days) | Stateless access + instant refresh invalidation |
++| Package Manager | `uv` — `pyproject.toml` + `uv.lock` | Fast, modern Python package management |
++| File Storage | TBD | — |
++| AI Provider | TBD | For tutoring + grading |
++| Vector DB | TBD | For RAG/material indexing |
++| Hosting | TBD | — |
+
+ ---
+
+@@ -43,19 +42,35 @@
+
+ ```
+-src/
+-  modules/
+-    auth/
+-    courses/
+-    tasks/
+-    sessions/
+-    materials/
+-    announcements/
+-    gradebook/
+-    analytics/
+-    ai-tutor/
+-    notifications/
+-    admin/
+-    hod/
+-  middleware/
+-    auth.middleware
+-    active-semester.middleware   (blocks writes on inactive semester)
+-    session-owner.middleware     (restricts session mutations to owner)
+-  config/
+-  utils/
+-  types/
++AMS/
++├── src/app/
++│   ├── api/v1/              ← route handlers only (no business logic)
++│   │   ├── auth.py
++│   │   ├── student.py
++│   │   ├── lecturer.py
++│   │   ├── hod.py
++│   │   ├── admin.py
++│   │   └── shared.py
++│   ├── services/            ← business logic; orchestrates repositories
++│   ├── repositories/        ← async DB/Redis queries only; zero business logic
++│   ├── models/              ← SQLAlchemy ORM models
++│   ├── schemas/             ← Pydantic v2 request/response schemas
++│   ├── core/                ← DB engine, Redis pool, JWT utils, lifespan hooks
++│   ├── middleware/          ← logging, CORS, rate-limit
++│   │   ├── auth             (validates JWT, attaches user)
++│   │   ├── active_semester  (blocks writes on inactive semester)
++│   │   └── session_owner    (restricts session mutations to owner)
++│   ├── workers/             ← ARQ background task definitions
++│   ├── config.py            ← single Settings class via lru_cache
++│   ├── dependencies.py      ← shared FastAPI Depends() helpers
++│   ├── exceptions.py        ← AppException hierarchy + global error handlers
++│   └── main.py              ← app factory + lifespan context manager
++├── tests/
++│   ├── unit/                ← service logic tested with mocked repositories
++│   └── integration/         ← real test-DB + Redis (no mocks)
++├── alembic/                 ← migration env and version scripts
++├── docker/                  ← Dockerfile + docker-compose
++├── docs/                    ← all spec files (ARCHITECTURE.md, ENDPOINTS.md, etc.)
++└── .github/workflows/       ← CI: lint → typecheck → test → docker build
+ ```
+
++> **Rule:** lower layers must never import from higher layers.
++> `api/v1/` → `services/` → `repositories/` → DB/Redis
++
+ ---
+
+@@ -77,3 +92,14 @@
+ | `activeSemester` | Blocks writes if no active semester | All POST/PATCH/DELETE under `/courses/:courseId/*` |
+ | `sessionOwner` | Restricts to session creator | PATCH/DELETE session, POST attendance |
+ | `authorizedLecturer` | Blocks unauthorized lecturers | All lecturer routes |
++
++---
++
++## Key Design Decisions
++
++- **Settings:** Single `Settings(BaseSettings)` class in `config.py`. `DEBUG=True` in production raises `ValueError` at startup.
++- **Database:** All models use `Mapped[T]` / `mapped_column()` — legacy `Column()` API is banned. Every model inherits `Base` and `TimestampMixin`.
++- **Sessions:** Injected via `Depends(get_db_session)` — never use a global session.
++- **Error handling:** All domain errors are `AppException` subclasses → `{ "error": "<CODE>", "detail": "<message>" }`. No stack traces to clients in production.
++- **Observability:** structlog (JSON in prod, coloured in local) + OpenTelemetry (OTLP HTTP) + Prometheus at `/metrics`.
++- **Health probes:** `GET /healthz` (liveness) · `GET /readyz` (readiness — checks DB + Redis).
++- **Local dev:** `uv sync --group dev` → `docker compose up postgres redis -d` → `uv run alembic upgrade head` → `uv run uvicorn app.main:app --reload`

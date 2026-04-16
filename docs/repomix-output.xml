@@ -1,0 +1,1233 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+architecture.md
+ARCHITECTURE.md
+architecture.patch
+BUSINESS_RULES.md
+DATABASE_SCHEMA.md
+DOC_HISTORY.md
+ENDPOINTS_DETAIL.md
+ENDPOINTS.md
+TASK_HISTORY.md
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="architecture.md">
+# AMS — Architecture Overview
+> Quick-reference for new developers. Read this first.
+
+---
+
+## Tech Stack at a Glance
+
+| Concern | Choice |
+|---------|--------|
+| Framework | FastAPI 0.115+ (async-first) |
+| ASGI server | Uvicorn (dev) · Gunicorn + Uvicorn workers (prod) |
+| DB | PostgreSQL 16 via SQLAlchemy 2.x async + asyncpg |
+| Migrations | Alembic (autogenerate from ORM models) |
+| Cache / Sessions | Redis 7 via redis-py async |
+| Auth | JWT (access) + opaque UUID stored in Redis (refresh) |
+| Package manager | `uv` — dependencies declared in `pyproject.toml`, lockfile is `uv.lock` |
+| Python | 3.12+ |
+
+---
+
+## Project Layout
+
+```
+AMS/
+├── src/app/         ← all application source code
+│   ├── api/v1/      ← thin route handlers only (no business logic here)
+│   ├── services/    ← business logic; orchestrates repositories
+│   ├── repositories/← async DB/Redis access only; zero business logic
+│   ├── models/      ← SQLAlchemy ORM models
+│   ├── schemas/     ← Pydantic v2 request / response schemas
+│   ├── core/        ← DB engine, Redis pool, JWT utils, lifespan hooks
+│   ├── middleware/  ← logging, tracing, CORS / rate-limit
+│   ├── workers/     ← ARQ background task definitions
+│   ├── config.py    ← single Settings class, loaded once via lru_cache
+│   ├── dependencies.py ← shared FastAPI Depends() helpers
+│   ├── exceptions.py   ← AppException hierarchy + global error handlers
+│   └── main.py      ← app factory + lifespan context manager
+├── tests/
+│   ├── unit/        ← service logic tested with mocked repositories
+│   └── integration/ ← real test-DB + Redis (no mocks)
+├── alembic/         ← migration env and version scripts
+├── docker/          ← Dockerfile (multi-stage) + docker-compose
+└── .github/workflows/ci.yml  ← lint → typecheck → test → docker build
+```
+
+---
+
+## Layered Architecture (strict call direction)
+
+```
+HTTP Request
+    │
+    ▼
+Router (api/v1/)      ← validates input, calls service, returns schema
+    │
+    ▼
+Service (services/)   ← business logic, raises AppException on failures
+    │
+    ▼
+Repository (repositories/)  ← async SQLAlchemy / Redis queries only
+    │
+    ▼
+Database / Redis
+```
+
+> **Rule:** lower layers must never import from higher layers.
+
+---
+
+## Key Design Decisions
+
+### Settings (`src/app/config.py`)
+- Single `Settings(BaseSettings)` class. Import the module-level `settings` singleton everywhere.
+- `ENVIRONMENT` is a `StrEnum`: `local | staging | production`.
+- `DEBUG=True` in production raises a `ValueError` at startup — prevents accidental misconfiguration.
+
+### Database (`src/app/core/database.py`)
+- SQLAlchemy 2.x **async** engine + `AsyncSession`.
+- All models use `Mapped[T]` / `mapped_column()` — the legacy `Column()` API is banned.
+- Every model inherits `Base` **and** `TimestampMixin` (adds `created_at`, `updated_at`).
+- Sessions are injected via `Depends(get_db_session)` — never use a global session.
+
+### Auth Flow
+1. `POST /api/v1/auth/login` → returns **access token** (JWT, 15 min) + **refresh token** (UUID, stored in Redis for 7 days).
+2. `POST /api/v1/auth/refresh` → validates refresh token in Redis, issues new access token.
+3. `POST /api/v1/auth/logout` → deletes refresh token from Redis (instant invalidation).
+4. Protected routes use `Depends(get_current_user)` declared at **router level**, not per-route.
+5. Passwords are bcrypt-hashed (cost factor 12) and **never returned in any response**.
+
+### Error Handling
+All domain errors are `AppException` subclasses. A global handler converts them to:
+```json
+{ "error": "<ERROR_CODE>", "detail": "<human message>" }
+```
+In production, unhandled exceptions are caught, logged via structlog, and a generic `500` is returned — no stack traces to clients.
+
+### Observability
+- **structlog**: JSON in production/staging, coloured console in local.
+- Every request is tagged with a `request_id` UUID and logs `method`, `path`, `status_code`, `duration_ms`.
+- **OpenTelemetry** (OTLP HTTP): instruments FastAPI, SQLAlchemy, httpx, Redis.
+- **Prometheus** metrics exposed at `/metrics`.
+
+### Health Probes
+| Endpoint | Auth | Purpose |
+|----------|------|---------|
+| `GET /healthz` | None | Liveness — always `200 {"status":"ok"}` |
+| `GET /readyz` | None | Readiness — `200` only if DB + Redis reachable; else `503` |
+
+---
+
+## Local Development
+
+```bash
+# 1. Copy env file and fill in values
+cp .env.example .env
+
+# 2. Install dependencies (uv reads pyproject.toml)
+uv sync --group dev
+
+# 3. Start backing services
+docker compose -f docker/docker-compose.yml up postgres redis -d
+
+# 4. Run migrations
+uv run alembic upgrade head
+
+# 5. Start dev server (auto-reload)
+uv run uvicorn app.main:app --reload --port 8000
+```
+
+---
+
+## Running Tests
+
+```bash
+# All tests (unit + integration) with coverage
+uv run pytest
+
+# Unit tests only (fast, no DB/Redis needed)
+uv run pytest tests/unit/
+
+# Integration tests (need TEST_DATABASE_URL + REDIS_URL in .env)
+uv run pytest tests/integration/
+```
+
+Coverage target: **≥ 80%** on `services/` and `repositories/` — enforced in CI.
+
+---
+
+## Adding a New Feature
+
+1. **Model** → `src/app/models/<domain>.py` + inherit `Base, TimestampMixin`.
+2. **Schema** → `src/app/schemas/<domain>.py` with Pydantic v2.
+3. **Repository** → `src/app/repositories/<domain>.py` extending `BaseRepository`.
+4. **Service** → `src/app/services/<domain>.py` — business logic only.
+5. **Router** → `src/app/api/v1/<domain>.py` — register in `src/app/api/router.py`.
+6. **Migration** → `uv run alembic revision --autogenerate -m "add <domain>"`.
+7. **Tests** → unit test the service; integration-test the endpoints.
+</file>
+
+<file path="ARCHITECTURE.md">
+# Architecture
+
+> Defines the fundamental architecture, stack, and live project structure.
+> Large architectural decisions (e.g. AI pipeline, file storage) should go in `/specs/arch/` and be referenced here.
+## Developer Instructions
+
+> **How to update:** Update stack decisions as they are finalized. Keep reasoning brief.
+> Large architectural decisions (e.g. AI pipeline, file storage strategy) should go in individual
+> files under `/specs/arch/` and be referenced here.
+>
+> **Keep in sync with:** `ENDPOINTS.md`, `DATABASE_SCHEMA.md`, `BUSINESS_RULES.md`, `DOC_HISTORY.md`
+> **Update the Folder Structure section** whenever a new module, layer, or significant directory is added.
+> Whenever the architecture changes (new layer, new service, stack decision), log the change in `DOC_HISTORY.md`.
+
+---
+
+## System Overview
+
+An academic LMS (Learning Management System) supporting Students, Lecturers, HODs, and Admins.
+Core features: course management, task/grading, attendance, AI tutoring, analytics.
+
+---
+
+## Architecture Style
+
+**Monolithic REST API** (modular internals, single deployable)
+- Feature-based module structure
+- Clear service/controller separation
+- Stateless — JWT auth, no server-side sessions
+
+---
+
+## Stack
+
+| Layer | Choice | Reason |
+|---|---|---|
+| Language | Python 3.12+ | — |
+| Framework | FastAPI 0.115+ (async-first) | Async-native, fast, excellent OpenAPI support |
+| ASGI Server | Uvicorn (dev) · Gunicorn + Uvicorn workers (prod) | Standard FastAPI deployment |
+| Database | PostgreSQL 16 | Relational, reliable, strong async support |
+| ORM | SQLAlchemy 2.x async + asyncpg | Async-first, type-safe with Mapped[] API |
+| Migrations | Alembic (autogenerate from ORM models) | Pairs with SQLAlchemy |
+| Cache / Sessions | Redis 7 via redis-py async | Refresh token storage, future caching |
+| Auth | JWT (access, 15 min) + opaque UUID in Redis (refresh, 7 days) | Stateless access + instant refresh invalidation |
+| Package Manager | `uv` — `pyproject.toml` + `uv.lock` | Fast, modern Python package management |
+| File Storage | TBD | — |
+| AI Provider | TBD | For tutoring + grading |
+| Vector DB | TBD | For RAG/material indexing |
+| Hosting | TBD | — |
+
+---
+
+## Folder Structure
+
+```
+AMS/
+├── src/app/
+│   ├── api/v1/              ← route handlers only (no business logic)
+│   │   ├── auth.py
+│   │   ├── student.py
+│   │   ├── lecturer.py
+│   │   ├── hod.py
+│   │   ├── admin.py
+│   │   └── shared.py
+│   ├── services/            ← business logic; orchestrates repositories
+│   ├── repositories/        ← async DB/Redis queries only; zero business logic
+│   ├── models/              ← SQLAlchemy ORM models
+│   ├── schemas/             ← Pydantic v2 request/response schemas
+│   ├── core/                ← DB engine, Redis pool, JWT utils, lifespan hooks
+│   ├── middleware/          ← logging, CORS, rate-limit
+│   │   ├── auth             (validates JWT, attaches user)
+│   │   ├── active_semester  (blocks writes on inactive semester)
+│   │   └── session_owner    (restricts session mutations to owner)
+│   ├── workers/             ← ARQ background task definitions
+│   ├── config.py            ← single Settings class via lru_cache
+│   ├── dependencies.py      ← shared FastAPI Depends() helpers
+│   ├── exceptions.py        ← AppException hierarchy + global error handlers
+│   └── main.py              ← app factory + lifespan context manager
+├── tests/
+│   ├── unit/                ← service logic tested with mocked repositories
+│   └── integration/         ← real test-DB + Redis (no mocks)
+├── alembic/                 ← migration env and version scripts
+├── docker/                  ← Dockerfile + docker-compose
+├── docs/                    ← all spec files (ARCHITECTURE.md, ENDPOINTS.md, etc.)
+└── .github/workflows/       ← CI: lint → typecheck → test → docker build
+```
+
+> **Rule:** lower layers must never import from higher layers.
+> `api/v1/` → `services/` → `repositories/` → DB/Redis
+
+
+---
+
+## ASCII Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    CLIENT APPS                      │
+│         (Web / Mobile — Student, Lecturer,          │
+│                    HOD, Admin)                      │
+└────────────────────────┬────────────────────────────┘
+                         │ HTTPS
+                         ▼
+┌─────────────────────────────────────────────────────┐
+│                   REST API SERVER                   │
+│                                                     │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
+│  │  Auth    │  │ Middleware│  │   Route Modules  │  │
+│  │  (JWT)   │  │ (semester,│  │ courses/tasks/   │  │
+│  └──────────┘  │  owner)  │  │ sessions/etc.    │  │
+│                └──────────┘  └──────────────────┘  │
+└────┬──────────────┬──────────────────┬──────────────┘
+     │              │                  │
+     ▼              ▼                  ▼
+┌─────────┐  ┌───────────┐   ┌────────────────┐
+│  Main   │  │   File    │   │   AI Services  │
+│   DB    │  │  Storage  │   │                │
+│         │  │           │   │ ┌────────────┐ │
+│ (users, │  │(materials,│   │ │  LLM API   │ │
+│ courses,│  │ markguide,│   │ │ (tutoring/ │ │
+│ tasks,  │  │ uploads)  │   │ │  grading)  │ │
+│ etc.)   │  └───────────┘   │ └────────────┘ │
+└─────────┘                  │ ┌────────────┐ │
+                             │ │ Vector DB  │ │
+                             │ │ (material  │ │
+                             │ │  indexing) │ │
+                             │ └────────────┘ │
+                             └────────────────┘
+```
+
+---
+
+## Key Middleware
+
+| Middleware | Purpose | Applied To |
+|---|---|---|
+| `authGuard` | Validates JWT, attaches user to request | All protected routes |
+| `activeSemester` | Blocks writes if no active semester | All POST/PATCH/DELETE under `/courses/:courseId/*` |
+| `sessionOwner` | Restricts to session creator | PATCH/DELETE session, POST attendance |
+| `authorizedLecturer` | Blocks unauthorized lecturers | All lecturer routes |
+
+---
+
+## Key Design Decisions
+
+- **Settings:** Single `Settings(BaseSettings)` class in `config.py`. `DEBUG=True` in production raises `ValueError` at startup.
+- **Database:** All models use `Mapped[T]` / `mapped_column()` — legacy `Column()` API is banned. Every model inherits `Base` and `TimestampMixin`.
+- **Sessions:** Injected via `Depends(get_db_session)` — never use a global session.
+- **Error handling:** All domain errors are `AppException` subclasses → `{ "error": "<CODE>", "detail": "<message>" }`. No stack traces to clients in production.
+- **Observability:** structlog (JSON in prod, coloured in local) + OpenTelemetry (OTLP HTTP) + Prometheus at `/metrics`.
+- **Health probes:** `GET /healthz` (liveness) · `GET /readyz` (readiness — checks DB + Redis).
+- **Local dev:** `uv sync --group dev` → `docker compose up postgres redis -d` → `uv run alembic upgrade head` → `uv run uvicorn app.main:app --reload`
+</file>
+
+<file path="architecture.patch">
+--- a/ARCHITECTURE.md
++++ b/ARCHITECTURE.md
+@@ -1,8 +1,6 @@
+ # Architecture
+
+-> Defines the fundamental architecture, stack, and structure of the project.
+-> **How to update:** Update stack decisions as they are finalized. Keep reasoning brief.
+-> Large architectural decisions (e.g. AI pipeline, file storage strategy) should go in individual
+-> files under `/specs/arch/` and be referenced here.
++> Defines the fundamental architecture, stack, and live project structure.
++> Large architectural decisions (e.g. AI pipeline, file storage) should go in `/specs/arch/` and be referenced here.
+ ## Developer Instructions
+
+ > **How to update:** Update stack decisions as they are finalized. Keep reasoning brief.
+@@ -10,6 +8,7 @@
+ > files under `/specs/arch/` and be referenced here.
+ >
+ > **Keep in sync with:** `ENDPOINTS.md`, `DATABASE_SCHEMA.md`, `BUSINESS_RULES.md`, `DOC_HISTORY.md`
++> **Update the Folder Structure section** whenever a new module, layer, or significant directory is added.
+ > Whenever the architecture changes (new layer, new service, stack decision), log the change in `DOC_HISTORY.md`.
+
+ ---
+@@ -29,13 +28,13 @@
+
+ | Layer | Choice | Reason |
+ |---|---|---|
+-| Language | TBD | — |
+-| Framework | TBD | — |
+-| Database | TBD | — |
+-| ORM | TBD | — |
+-| Auth | JWT | Stateless, standard |
+-| File Storage | TBD | — |
+-| AI Provider | TBD | For tutoring + grading |
+-| Vector DB | TBD | For RAG/material indexing |
+-| Hosting | TBD | — |
++| Language | Python 3.12+ | — |
++| Framework | FastAPI 0.115+ (async-first) | Async-native, fast, excellent OpenAPI support |
++| ASGI Server | Uvicorn (dev) · Gunicorn + Uvicorn workers (prod) | Standard FastAPI deployment |
++| Database | PostgreSQL 16 | Relational, reliable, strong async support |
++| ORM | SQLAlchemy 2.x async + asyncpg | Async-first, type-safe with Mapped[] API |
++| Migrations | Alembic (autogenerate from ORM models) | Pairs with SQLAlchemy |
++| Cache / Sessions | Redis 7 via redis-py async | Refresh token storage, future caching |
++| Auth | JWT (access, 15 min) + opaque UUID in Redis (refresh, 7 days) | Stateless access + instant refresh invalidation |
++| Package Manager | `uv` — `pyproject.toml` + `uv.lock` | Fast, modern Python package management |
++| File Storage | TBD | — |
++| AI Provider | TBD | For tutoring + grading |
++| Vector DB | TBD | For RAG/material indexing |
++| Hosting | TBD | — |
+
+ ---
+
+@@ -43,19 +42,35 @@
+
+ ```
+-src/
+-  modules/
+-    auth/
+-    courses/
+-    tasks/
+-    sessions/
+-    materials/
+-    announcements/
+-    gradebook/
+-    analytics/
+-    ai-tutor/
+-    notifications/
+-    admin/
+-    hod/
+-  middleware/
+-    auth.middleware
+-    active-semester.middleware   (blocks writes on inactive semester)
+-    session-owner.middleware     (restricts session mutations to owner)
+-  config/
+-  utils/
+-  types/
++AMS/
++├── src/app/
++│   ├── api/v1/              ← route handlers only (no business logic)
++│   │   ├── auth.py
++│   │   ├── student.py
++│   │   ├── lecturer.py
++│   │   ├── hod.py
++│   │   ├── admin.py
++│   │   └── shared.py
++│   ├── services/            ← business logic; orchestrates repositories
++│   ├── repositories/        ← async DB/Redis queries only; zero business logic
++│   ├── models/              ← SQLAlchemy ORM models
++│   ├── schemas/             ← Pydantic v2 request/response schemas
++│   ├── core/                ← DB engine, Redis pool, JWT utils, lifespan hooks
++│   ├── middleware/          ← logging, CORS, rate-limit
++│   │   ├── auth             (validates JWT, attaches user)
++│   │   ├── active_semester  (blocks writes on inactive semester)
++│   │   └── session_owner    (restricts session mutations to owner)
++│   ├── workers/             ← ARQ background task definitions
++│   ├── config.py            ← single Settings class via lru_cache
++│   ├── dependencies.py      ← shared FastAPI Depends() helpers
++│   ├── exceptions.py        ← AppException hierarchy + global error handlers
++│   └── main.py              ← app factory + lifespan context manager
++├── tests/
++│   ├── unit/                ← service logic tested with mocked repositories
++│   └── integration/         ← real test-DB + Redis (no mocks)
++├── alembic/                 ← migration env and version scripts
++├── docker/                  ← Dockerfile + docker-compose
++├── docs/                    ← all spec files (ARCHITECTURE.md, ENDPOINTS.md, etc.)
++└── .github/workflows/       ← CI: lint → typecheck → test → docker build
+ ```
+
++> **Rule:** lower layers must never import from higher layers.
++> `api/v1/` → `services/` → `repositories/` → DB/Redis
++
+ ---
+
+@@ -77,3 +92,14 @@
+ | `activeSemester` | Blocks writes if no active semester | All POST/PATCH/DELETE under `/courses/:courseId/*` |
+ | `sessionOwner` | Restricts to session creator | PATCH/DELETE session, POST attendance |
+ | `authorizedLecturer` | Blocks unauthorized lecturers | All lecturer routes |
++
++---
++
++## Key Design Decisions
++
++- **Settings:** Single `Settings(BaseSettings)` class in `config.py`. `DEBUG=True` in production raises `ValueError` at startup.
++- **Database:** All models use `Mapped[T]` / `mapped_column()` — legacy `Column()` API is banned. Every model inherits `Base` and `TimestampMixin`.
++- **Sessions:** Injected via `Depends(get_db_session)` — never use a global session.
++- **Error handling:** All domain errors are `AppException` subclasses → `{ "error": "<CODE>", "detail": "<message>" }`. No stack traces to clients in production.
++- **Observability:** structlog (JSON in prod, coloured in local) + OpenTelemetry (OTLP HTTP) + Prometheus at `/metrics`.
++- **Health probes:** `GET /healthz` (liveness) · `GET /readyz` (readiness — checks DB + Redis).
++- **Local dev:** `uv sync --group dev` → `docker compose up postgres redis -d` → `uv run alembic upgrade head` → `uv run uvicorn app.main:app --reload`
+</file>
+
+<file path="BUSINESS_RULES.md">
+# Business Rules
+
+> Captures system-wide logic and constraints that are not obvious from the endpoint schema alone.
+> **How to update:** Add rules as they are decided. One rule per entry, keep it concise.
+> If a rule requires significant elaboration, create a file under `/specs/rules/` and reference it here.
+> Review this file whenever implementing auth, middleware, or any conditional logic.
+
+---
+
+## Academic Structure
+
+- An AcademicSession (e.g. "2024/2025") contains two semesters: first and second
+- Only one semester can be active globally at a time — Admin controls this
+- Activating a semester automatically deactivates the currently active one
+- A CourseOffering is tied to a specific semester
+- Only one active offering per course at a time — backend enforces on creation
+
+---
+
+## Semester & Write Access
+
+- Any write operation under `/courses/:courseId/*` requires the offering's semester to be active
+- If semester is inactive → 403 "No active semester"
+- Read operations (GET) are always allowed regardless of semester state
+- This applies to: task submissions, session creation, attendance marking, material uploads, announcements
+
+---
+
+## Course & Offering Resolution
+
+- `:courseId` in student/lecturer routes refers to a CourseOffering ID, not a Course definition ID
+- The course title, code, units etc. are joined from the Course definition for display
+- `GET /courses` returns active offerings for the currently active semester only
+- `GET /student/courses` defaults to active semester; accepts optional `semesterId` for past semesters
+- `GET /lecturer/courses` defaults to active semester; accepts optional `semesterId` for past semesters
+
+---
+
+## Student Registration
+
+- Student can register for a course if: the semester is active AND they are not already registered
+- Registration status starts as `pending` — lecturer must approve
+- A student can drop a course (DELETE /courses/:courseId/register) only while semester is active
+
+---
+
+## Level Computation
+
+- Student level is never stored — always computed at runtime
+- Formula: `level = (currentSessionYear - admission_year + 1) + levelOffset`
+- `admission_year` is stored as the start year only (e.g. 2021, not "2021/2022")
+- `levelOffset` defaults to 0; only updated by HOD for deferrals/repeats
+- Frontend formats level for display (e.g. `3 → 300 level`)
+- No cap on level — no programme duration enforced
+
+---
+
+## Session Ownership
+
+- A session is owned by the lecturer who created it
+- Only the session owner can: edit the session, cancel it, mark attendance
+- Other lecturers on the same course can view sessions but not modify them
+- `isOwner: boolean` is returned in session detail responses for lecturer
+
+---
+
+## Attendance
+
+- Attendance is always tied to a class session — never standalone
+- Attendance can only be marked by the session owner
+- `attended: boolean | null` — null means attendance has not been taken yet for that session
+
+---
+
+## Materials & AI Tutor
+
+- Material visibility: `students_only` | `ai_only` | `both`
+- Only materials with visibility `ai_only` or `both` can be indexed for the AI tutor
+- Indexing `students_only` material is rejected with 400
+- AI tutor only uses indexed materials for grounding (RAG)
+- Lecturer can set custom rules/instructions for the AI tutor per course
+
+---
+
+## Task & Grading
+
+- A task has one type — all questions are the same type (mcq | free_text | document_upload)
+- `totalScore` on a task is computed as the sum of all question scores — never stored directly
+- Marking guide must be uploaded before AI grading can be enabled
+- Enabling AI grading without a marking guide → 400 validation error
+- `gradingStatus` enum: `ungraded` | `ai_draft` | `ai_approved` | `manually_graded`
+- MCQ answers can be auto-graded once correct answers are defined (future feature)
+- Bulk AI grade approval sets all `ai_draft` submissions to `ai_approved`
+
+---
+
+## Lecturer Authorization
+
+- Lecturers self-register but cannot access lecturer routes until authorized by Admin
+- Unauthorized lecturer → 403 on all lecturer-scoped routes
+- HOD cannot assign an unauthorized lecturer to an offering
+
+---
+
+## HOD Scope
+
+- HOD can only manage users, courses, and offerings within their own department
+- HOD cannot access or modify data belonging to other departments
+
+---
+
+## Admin
+
+- Admin has global access across all faculties, departments, and users
+- Only Admin can create/activate academic sessions and semesters
+- Only Admin can assign or replace a HOD for a department
+- Only Admin can bulk-authorize lecturer accounts
+</file>
+
+<file path="DATABASE_SCHEMA.md">
+# Database Schema
+
+> Defines the core data models and their relationships.
+> **How to update:** Add fields as they are finalized. Keep types simple and readable.
+> Avoid adding every index or constraint here — this is for structure and relationships, not migrations.
+> If a model becomes complex (e.g. analytics, AI pipeline), move it to `/specs/schema/` and reference it here.
+
+---
+
+## Models
+
+### User
+```
+id
+firstName, lastName, email, passwordHash
+role                enum: student | lecturer | hod | admin
+departmentId        FK → Department
+phone, avatar       nullable
+
+# student only
+admission_year      int | null
+levelOffset         int | null  (default: 0)
+
+# lecturer only
+staff_id            string | null
+isAuthorized        bool | null
+
+createdAt, updatedAt
+```
+
+### Faculty
+```
+id
+name, code
+createdAt
+```
+
+### Department
+```
+id
+facultyId           FK → Faculty
+name, code
+hodId               FK → User | null
+createdAt
+```
+
+### AcademicSession
+```
+id
+name                (e.g. "2024/2025")
+createdAt
+```
+
+### Semester
+```
+id
+academicSessionId   FK → AcademicSession
+name                enum: first | second
+startDate, endDate
+isActive            bool (only one true globally)
+```
+
+### Course
+```
+id
+departmentId        FK → Department
+title, code
+description         nullable
+units               int
+createdAt
+```
+
+### CourseOffering
+```
+id
+courseId            FK → Course
+semesterId          FK → Semester
+lecturerId          FK → User | null
+isActive            bool
+```
+
+### CourseRegistration
+```
+id
+offeringId          FK → CourseOffering
+studentId           FK → User
+status              enum: pending | approved | rejected
+createdAt
+```
+
+### Material
+```
+id
+offeringId          FK → CourseOffering
+uploadedBy          FK → User
+title
+type                enum: note | slide | resource
+fileUrl
+visibility          enum: students_only | ai_only | both
+indexed             bool (default: false)
+indexedAt           nullable
+createdAt
+```
+
+### Task
+```
+id
+offeringId          FK → CourseOffering
+sessionId           FK → ClassSession | null
+title
+description         nullable
+dueDate
+aiGrading           bool (default: false)
+markingGuideUrl     nullable
+createdAt
+```
+
+### Question
+```
+id
+taskId              FK → Task
+text
+type                enum: mcq | free_text | document_upload
+score               number
+options             string[] | null  (only for mcq)
+```
+
+### Submission
+```
+id
+taskId              FK → Task
+studentId           FK → User
+submittedAt
+gradingStatus       enum: ungraded | ai_draft | ai_approved | manually_graded
+totalScore          number | null
+gradedAt            nullable
+```
+
+### Answer
+```
+id
+submissionId        FK → Submission
+questionId          FK → Question
+selectedOption      string | null   (mcq)
+textAnswer          string | null   (free_text)
+fileUrl             string | null   (document_upload)
+score               number | null
+feedback            string | null
+```
+
+### ClassSession
+```
+id
+offeringId          FK → CourseOffering
+lecturerId          FK → User  (owner)
+title
+scheduledAt
+venue               nullable
+status              enum: upcoming | completed | cancelled
+notes               nullable
+createdAt
+```
+
+### Attendance
+```
+id
+sessionId           FK → ClassSession
+studentId           FK → User
+status              enum: present | absent
+markedAt
+markedBy            FK → User
+```
+
+### Announcement
+```
+id
+offeringId          FK → CourseOffering
+lecturerId          FK → User
+title
+body
+pinned              bool (default: false)
+createdAt, updatedAt
+```
+
+### AnnouncementView
+```
+id
+announcementId      FK → Announcement
+studentId           FK → User
+viewedAt
+```
+
+### Notification
+```
+id
+userId              FK → User
+message
+type                string
+read                bool (default: false)
+link                nullable
+createdAt
+```
+
+### GradebookEntry
+```
+id
+offeringId          FK → CourseOffering
+studentId           FK → User
+manualGrade         string | null
+notes               string | null
+updatedAt
+```
+
+### AITutorRule
+```
+id
+offeringId          FK → CourseOffering
+rules               text
+updatedAt
+```
+
+---
+
+## Key Relationships
+
+```
+Faculty         → has many Departments
+Department      → has many Courses, Users
+AcademicSession → has many Semesters
+Semester        → has many CourseOfferings
+Course          → has many CourseOfferings
+CourseOffering  → has many Materials, Tasks, Sessions, Announcements, Registrations
+Task            → has many Questions, Submissions
+Submission      → has many Answers
+ClassSession    → has many Attendance records
+```
+</file>
+
+<file path="DOC_HISTORY.md">
+# DOC History
+
+---
+
+## About
+
+A chronological log of all changes made to documentation files in this project.
+One entry per meaningful change — no prose, just facts.
+
+---
+
+## Developer Instructions
+
+> **How to update:** Every time you modify a file in `/docs/`, add a line at the top of the log below.
+> Format: `YYYY-MM-DD | <file(s) changed> | <short description>`
+> Do **not** delete old entries. Archive to `DOC_HISTORY_ARCHIVE.md` if the file exceeds 150 lines.
+>
+> **Files that require a log entry on change:**
+> `ARCHITECTURE.md`, `ENDPOINTS.md`, `ENDPOINTS_DETAIL.md`, `DATABASE_SCHEMA.md`,
+> `BUSINESS_RULES.md`, `TASK_HISTORY.md`
+
+---
+
+## Log
+
+| Date | File(s) | Change |
+|------|---------|--------|
+| 2026-04-16 | `ARCHITECTURE.md`, `DOC_HISTORY.md` | Comprehensive update to architecture: stack versions, refined structure, and key design decisions |
+| 2026-04-16 | `ARCHITECTURE.md`, `ENDPOINTS.md`, `ENDPOINTS_DETAIL.md`, `DOC_HISTORY.md` | Restructured docs: separated About from instructions, added sync requirements, created detailed endpoint spec file and this history log |
+</file>
+
+<file path="ENDPOINTS_DETAIL.md">
+# Endpoint Specifications — Detailed
+
+---
+
+## About
+
+This file contains the **full specification** for every AMS API endpoint.
+For a concise route-list overview, see `ENDPOINTS.md`.
+
+---
+
+## Developer Instructions
+
+> **How to update:** When an endpoint is added, modified, or removed:
+> 1. Update the route list in **`ENDPOINTS.md`** immediately.
+> 2. Update or add the full spec entry here in **this file**.
+> 3. Log the change in **`DOC_HISTORY.md`**.
+>
+> **Keep in sync with:** `ENDPOINTS.md` — the route list there must always match the entries here.
+> This file is the source of truth for request/response shapes, query params, body fields, and error codes.
+
+---
+
+## Auth
+
+<!-- Add full Auth endpoint specs here -->
+
+---
+
+## Student
+
+<!-- Add full Student endpoint specs here -->
+
+---
+
+## Lecturer
+
+<!-- Add full Lecturer endpoint specs here -->
+
+---
+
+## HOD
+
+<!-- Add full HOD endpoint specs here -->
+
+---
+
+## Admin
+
+<!-- Add full Admin endpoint specs here -->
+
+---
+
+## Shared
+
+<!-- Add full Shared endpoint specs here -->
+</file>
+
+<file path="ENDPOINTS.md">
+# Endpoint Specifications
+
+---
+
+## About
+
+This file is the **index** of all API endpoints in the AMS project.
+It lists every route grouped by role/feature. For full request/response specifications,
+body shapes, query params, and error codes — see `ENDPOINTS_DETAIL.md`.
+
+> **Note:** In student and lecturer routes, `:courseId` refers to a **CourseOffering ID**, not a Course definition ID.
+> The distinction is only explicit in HOD routes.
+
+---
+
+## Developer Instructions
+
+> **How to update:** When an endpoint is added, modified, or removed:
+> 1. Update the route list in **this file** immediately.
+> 2. Update the full spec entry in **`ENDPOINTS_DETAIL.md`** to match.
+> 3. Log the change in **`DOC_HISTORY.md`**.
+>
+> **Keep in sync with:** `ENDPOINTS_DETAIL.md` — these two files must always agree.
+> This file stays concise (route list only). `ENDPOINTS_DETAIL.md` holds the full definitions.
+> Endpoints marked `(plan not finished)` need further definition before implementation.
+
+---
+
+## Auth
+
+```
+POST /auth/register/student
+POST /auth/register/lecturer
+POST /auth/login
+POST /auth/logout
+POST /auth/forgot-password
+POST /auth/reset-password
+GET  /auth/me
+PATCH /auth/me
+PATCH /auth/me/student
+PATCH /auth/me/lecturer
+PATCH /auth/me/password
+```
+→ See: [`ENDPOINTS_DETAIL.md` — Auth](./ENDPOINTS_DETAIL.md#auth)
+
+---
+
+## Student
+
+```
+# Course
+GET    /courses
+GET    /courses/:courseId
+POST   /courses/:courseId/register
+DELETE /courses/:courseId/register
+
+GET    /student/courses                       ?semesterId
+
+# Materials
+GET    /student/courses/:courseId/materials   ?type
+
+# Tasks
+GET    /student/courses/:courseId/tasks       ?status
+GET    /student/courses/:courseId/tasks/:taskId
+POST   /student/courses/:courseId/tasks/:taskId/submit
+
+# Grades
+GET    /student/courses/:courseId/grades
+
+# Announcements
+GET    /student/courses/:courseId/announcements
+GET    /student/courses/:courseId/announcements/:announcementId
+PATCH  /student/courses/:courseId/announcements/:announcementId/viewed
+
+# Sessions
+GET    /student/courses/:courseId/sessions    ?status ?lecturerId
+GET    /student/courses/:courseId/sessions/:sessionId
+
+# Attendance
+GET    /student/courses/:courseId/attendance
+
+# Analytics (plan not finished)
+GET    /student/analytics
+GET    /student/courses/:courseId/analytics
+
+# AI Tutor (plan not finished)
+POST   /student/courses/:courseId/ai-tutor
+```
+→ See: [`ENDPOINTS_DETAIL.md` — Student](./ENDPOINTS_DETAIL.md#student)
+
+---
+
+## Lecturer
+
+```
+# Courses
+GET    /lecturer/courses                      ?semesterId
+GET    /lecturer/courses/:courseId
+
+# Students
+GET    /lecturer/courses/:courseId/students   ?status
+PATCH  /lecturer/courses/:courseId/students/:studentId/approve
+
+# Materials
+POST   /lecturer/courses/:courseId/materials
+PATCH  /lecturer/courses/:courseId/materials/:materialId
+DELETE /lecturer/courses/:courseId/materials/:materialId
+POST   /lecturer/courses/:courseId/materials/:materialId/index
+
+# Tasks
+POST   /lecturer/courses/:courseId/tasks
+PATCH  /lecturer/courses/:courseId/tasks/:taskId
+DELETE /lecturer/courses/:courseId/tasks/:taskId
+GET    /lecturer/courses/:courseId/tasks
+GET    /lecturer/courses/:courseId/tasks/:taskId
+POST   /lecturer/courses/:courseId/tasks/:taskId/marking-guide
+PATCH  /lecturer/courses/:courseId/tasks/:taskId/ai-grading
+
+# Questions
+POST   /lecturer/courses/:courseId/tasks/:taskId/questions
+PATCH  /lecturer/courses/:courseId/tasks/:taskId/questions/:questionId
+DELETE /lecturer/courses/:courseId/tasks/:taskId/questions/:questionId
+
+# Submissions
+GET    /lecturer/courses/:courseId/tasks/:taskId/submissions            ?graded
+GET    /lecturer/courses/:courseId/tasks/:taskId/submissions/:submissionId
+PATCH  /lecturer/courses/:courseId/tasks/:taskId/submissions/:submissionId/grade
+POST   /lecturer/courses/:courseId/tasks/:taskId/submissions/approve-ai-grades
+
+# Sessions
+POST   /lecturer/courses/:courseId/sessions
+PATCH  /lecturer/courses/:courseId/sessions/:sessionId
+DELETE /lecturer/courses/:courseId/sessions/:sessionId
+GET    /lecturer/courses/:courseId/sessions                             ?status
+GET    /lecturer/courses/:courseId/sessions/:sessionId
+POST   /lecturer/courses/:courseId/sessions/:sessionId/attendance
+
+# Announcements
+POST   /lecturer/courses/:courseId/announcements
+GET    /lecturer/courses/:courseId/announcements                        ?pinned
+GET    /lecturer/courses/:courseId/announcements/:announcementId
+PATCH  /lecturer/courses/:courseId/announcements/:announcementId
+DELETE /lecturer/courses/:courseId/announcements/:announcementId
+
+# Gradebook
+GET    /lecturer/courses/:courseId/gradebook
+PATCH  /lecturer/courses/:courseId/gradebook/:studentId
+
+# Analytics (plan not finished)
+GET    /lecturer/courses/:courseId/analytics
+GET    /lecturer/analytics
+
+# AI Tutor (plan not finished)
+POST   /lecturer/courses/:courseId/ai-tutor
+PATCH  /lecturer/courses/:courseId/ai-tutor/rules
+```
+→ See: [`ENDPOINTS_DETAIL.md` — Lecturer](./ENDPOINTS_DETAIL.md#lecturer)
+
+---
+
+## HOD
+
+```
+# Students
+GET    /hod/students                          ?search
+GET    /hod/students/:studentId
+PATCH  /hod/students/:studentId/level-offset
+
+# Lecturers
+GET    /hod/lecturers                         ?search
+GET    /hod/lecturers/:lecturerId
+
+# Course Definitions
+POST   /hod/courses
+GET    /hod/courses                           ?search
+GET    /hod/courses/:courseId
+PATCH  /hod/courses/:courseId
+DELETE /hod/courses/:courseId
+
+# Offerings
+POST   /hod/courses/:courseId/offerings
+GET    /hod/courses/:courseId/offerings       ?semesterId ?isActive
+GET    /hod/courses/:courseId/offerings/:offeringId
+PATCH  /hod/courses/:courseId/offerings/:offeringId/activate
+POST   /hod/courses/:courseId/offerings/:offeringId/assign
+DELETE /hod/courses/:courseId/offerings/:offeringId/assign/:lecturerId
+```
+→ See: [`ENDPOINTS_DETAIL.md` — HOD](./ENDPOINTS_DETAIL.md#hod)
+
+---
+
+## Admin
+
+```
+# Faculties
+POST   /admin/faculties
+GET    /admin/faculties
+PATCH  /admin/faculties/:facultyId
+DELETE /admin/faculties/:facultyId
+
+# Departments
+POST   /admin/faculties/:facultyId/departments
+GET    /admin/faculties/:facultyId/departments
+GET    /admin/faculties/:facultyId/departments/:departmentId
+PATCH  /admin/faculties/:facultyId/departments/:departmentId
+DELETE /admin/faculties/:facultyId/departments/:departmentId
+POST   /admin/departments/:departmentId/hod
+PATCH  /admin/departments/:departmentId/hod
+
+# Academic Calendar
+POST   /admin/academic-sessions
+GET    /admin/academic-sessions
+GET    /admin/academic-sessions/:sessionId
+PATCH  /admin/academic-sessions/:sessionId
+DELETE /admin/academic-sessions/:sessionId
+PATCH  /admin/academic-sessions/:sessionId/semesters/:semesterId/activate
+PATCH  /admin/academic-sessions/:sessionId/semesters/:semesterId
+DELETE /admin/academic-sessions/:sessionId/semesters/:semesterId
+
+# Users
+GET    /admin/users                           ?role ?department ?search
+POST   /admin/staff/authorize
+```
+→ See: [`ENDPOINTS_DETAIL.md` — Admin](./ENDPOINTS_DETAIL.md#admin)
+
+---
+
+## Shared
+
+```
+GET    /materials/:materialId/download
+GET    /notifications                         ?read
+PATCH  /notifications/:notificationId/read
+```
+→ See: [`ENDPOINTS_DETAIL.md` — Shared](./ENDPOINTS_DETAIL.md#shared)
+</file>
+
+<file path="TASK_HISTORY.md">
+# Task History
+
+> Tracks meaningful decisions and completed planning milestones.
+> **How to update:** Add a single line or short entry per task/decision. No prose. No duplicates.
+> If a decision has significant detail, put it in the relevant spec file and reference it here.
+> Keep this file under 100 lines — archive old entries to `TASK_HISTORY_ARCHIVE.md` if needed.
+
+---
+
+## Completed
+
+- Defined system roles: Student, Lecturer, HOD, Admin
+- Defined features: Dashboard, Materials, Tasks, Announcements, AI Tutor, Auto-grading, Attendance
+- Defined all functional requirements per role
+- Defined full endpoint list (~100 endpoints) — see `ENDPOINTS.md`
+- Decided on Course vs CourseOffering model (HOD manages definitions, offerings are per-semester instances)
+- Decided `:courseId` in student/lecturer routes refers to offeringId under the hood
+- Decided academic hierarchy: AcademicSession → Semester → CourseOffering
+- Decided one active semester at a time (Admin controlled)
+- Decided one active offering per course at a time (HOD enforced)
+- Decided single user table with role-specific nullable fields
+- Decided level is computed at runtime, not stored (see BUSINESS_RULES.md)
+- Decided task types: mcq | free_text | document_upload (one type per task, mixed questions allowed)
+- Decided marking guide is uploaded separately, required before AI grading can be enabled
+- Decided material visibility: students_only | ai_only | both
+- Decided gradingStatus: ungraded | ai_draft | ai_approved | manually_graded
+- Decided class sessions are owned by the lecturer who creates them
+- Decided attendance is always tied to a session, never standalone
+- Decided tasks can be optionally linked to a session via sessionId
+- Dropped: registration window, level cap/duration, level storage
+
+---
+
+## In Progress
+
+- Database schema definition
+- Business rules document
+- Architecture document
+- Frontend screen definitions
+</file>
+
+</files>
