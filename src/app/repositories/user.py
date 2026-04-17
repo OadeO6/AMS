@@ -44,3 +44,39 @@ class UserRepository(BaseRepository[User]):
         """Return ``True`` if a user with this email already exists."""
         result = await self._session.scalars(select(User.id).where(User.email == email).limit(1))
         return result.first() is not None
+
+    async def list_users(
+        self,
+        *,
+        role: str | None = None,
+        department_id: uuid.UUID | None = None,
+        search: str | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[int, list[User]]:
+        """Return total count and a paginated list of users."""
+        from sqlalchemy import func, or_
+
+        stmt = select(User)
+        count_stmt = select(func.count()).select_from(User)
+
+        if role:
+            stmt = stmt.where(User.role == role)
+            count_stmt = count_stmt.where(User.role == role)
+        if department_id:
+            stmt = stmt.where(User.department_id == department_id)
+            count_stmt = count_stmt.where(User.department_id == department_id)
+        if search:
+            search_filter = or_(
+                User.first_name.ilike(f"%{search}%"),
+                User.last_name.ilike(f"%{search}%"),
+                User.email.ilike(f"%{search}%"),
+            )
+            stmt = stmt.where(search_filter)
+            count_stmt = count_stmt.where(search_filter)
+
+        stmt = stmt.order_by(User.created_at.desc()).offset(skip).limit(limit)
+
+        total = await self._session.scalar(count_stmt) or 0
+        result = await self._session.scalars(stmt)
+        return total, list(result.all())

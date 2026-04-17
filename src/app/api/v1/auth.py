@@ -38,6 +38,7 @@ from app.schemas.user import (
     LecturerUpdate,
     PasswordUpdate,
     StudentRegister,
+    StudentUpdate,
     UserPublic,
     UserUpdate,
 )
@@ -122,34 +123,29 @@ async def logout(
 
 
 # ---------------------------------------------------------------------------
-# Password recovery (Phase 2+ — stubs return 202/501 now)
+# Password recovery
 # ---------------------------------------------------------------------------
 
 
-@router.post(
-    "/forgot-password",
-    summary="Initiate password reset",
-    status_code=status.HTTP_202_ACCEPTED,
-)
-async def forgot_password(payload: ForgotPasswordRequest) -> JSONResponse:
-    """Send a password-reset email (email service implemented in Phase 2+)."""
-    # Always return 202 regardless of whether the email exists
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+async def forgot_password(payload: ForgotPasswordRequest, session: DBSession) -> JSONResponse:
+    """Request a password reset link (returns 200 even if email not found)."""
+    svc = AuthService(session)
+    await svc.forgot_password(payload.email)
     return JSONResponse(
-        status_code=status.HTTP_202_ACCEPTED,
-        content={"detail": "If this email is registered you will receive a reset link."},
+        status_code=status.HTTP_200_OK,
+        content={"message": "If that email exists, a reset link was sent."},
     )
 
 
-@router.post(
-    "/reset-password",
-    summary="Complete password reset",
-    status_code=status.HTTP_501_NOT_IMPLEMENTED,
-)
-async def reset_password(payload: ResetPasswordRequest) -> JSONResponse:
-    """Reset password with a one-time token (not implemented until Phase 2+)."""
+@router.post("/reset-password", status_code=status.HTTP_200_OK)
+async def reset_password(payload: ResetPasswordRequest, session: DBSession) -> JSONResponse:
+    """Reset password using a token."""
+    svc = AuthService(session)
+    await svc.reset_password(payload.token, payload.new_password)
     return JSONResponse(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        content={"detail": "Not implemented in this phase."},
+        status_code=status.HTTP_200_OK,
+        content={"message": "Password updated successfully."},
     )
 
 
@@ -190,16 +186,17 @@ async def update_me(
     "/me/student",
     response_model=UserPublic,
     summary="Update student-specific profile fields",
-    status_code=status.HTTP_501_NOT_IMPLEMENTED,
+    status_code=status.HTTP_200_OK,
 )
 async def update_me_student(
+    payload: StudentUpdate,
     current_user: CurrentUser,
-) -> JSONResponse:
-    """Student-specific profile patch (no writable student-only fields in Phase 1)."""
-    return JSONResponse(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        content={"detail": "Not implemented in this phase."},
-    )
+    session: DBSession,
+) -> UserPublic:
+    """Student-specific profile patch (admission_year)."""
+    svc = UserService(session)
+    updated = await svc.update_student_profile(current_user.id, payload)
+    return UserPublic.model_validate(updated)
 
 
 @router.patch(

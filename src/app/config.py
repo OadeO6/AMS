@@ -77,6 +77,18 @@ class Settings(BaseSettings):
     WEB_CONCURRENCY: int = 4
 
     # ------------------------------------------------------------------
+    # External Systems (Phase 9)
+    # ------------------------------------------------------------------
+    AWS_ACCESS_KEY_ID: str | None = None
+    AWS_SECRET_ACCESS_KEY: str | None = None
+    S3_BUCKET_NAME: str = "ams-storage-bucket"
+
+    OPENAI_API_KEY: str | None = None
+
+    VECTOR_DB_URL: str | None = None
+    VECTOR_DB_API_KEY: str | None = None
+
+    # ------------------------------------------------------------------
     # Field validators
     # ------------------------------------------------------------------
 

@@ -176,10 +176,112 @@ async def lecturer_user(db_session: AsyncSession) -> User:
     return user
 
 
+from datetime import date
+import uuid
+from app.models.academic_session import AcademicSession, Semester
+from app.models.course import Course, CourseOffering, CourseRegistration
+from app.models.department import Department
+from app.models.faculty import Faculty
+
+@pytest.fixture
+async def setup_lecturer_data(db_session: AsyncSession, lecturer_user: User, student_user: User):
+    # Semester setup
+    academic_session = AcademicSession(name=f"2024/2025-{uuid.uuid4().hex[:4]}")
+    db_session.add(academic_session)
+    await db_session.flush()
+    
+    semester = Semester(
+        academic_session_id=academic_session.id,
+        name="first",
+        start_date=date(2024, 9, 1),
+        end_date=date(2024, 12, 15),
+        is_active=True
+    )
+    db_session.add(semester)
+    
+    # Faculty & Dept & Course
+    fac = Faculty(name="Science", code=f"SCI-{uuid.uuid4().hex[:4]}")
+    db_session.add(fac)
+    await db_session.flush()
+    
+    dept = Department(faculty_id=fac.id, name="Math", code=f"MTH-{uuid.uuid4().hex[:4]}")
+    db_session.add(dept)
+    await db_session.flush()
+    
+    course = Course(title="Calculus I", code=f"MTH101-{uuid.uuid4().hex[:4]}", units=3, department_id=dept.id)
+    db_session.add(course)
+    await db_session.flush()
+    
+    # Assign lecturer to offering
+    offering = CourseOffering(course_id=course.id, semester_id=semester.id, is_active=True, lecturer_id=lecturer_user.id)
+    db_session.add(offering)
+    await db_session.flush()
+
+    # Register student
+    reg = CourseRegistration(student_id=student_user.id, offering_id=offering.id, status="approved")
+    db_session.add(reg)
+    await db_session.commit()
+    
+    return {
+        "lecturer": lecturer_user,
+        "student": student_user,
+        "semester": semester,
+        "course": course,
+        "offering": offering,
+        "registration": reg
+    }
+
+
 @pytest.fixture
 async def lecturer_headers(lecturer_user: User) -> dict[str, str]:
     """Return Authorization headers for the authorized lecturer user."""
     token = create_access_token(subject=str(lecturer_user.id))
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+async def admin_user(db_session: AsyncSession) -> User:
+    """Create an admin user."""
+    user = User(
+        email="admin@example.com",
+        first_name="Admin",
+        last_name="User",
+        hashed_password=get_password_hash("securepassword123"),
+        role=UserRole.ADMIN,
+        is_active=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    return user
+
+
+@pytest.fixture
+async def admin_headers(admin_user: User) -> dict[str, str]:
+    """Return Authorization headers for the admin user."""
+    token = create_access_token(subject=str(admin_user.id))
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+async def hod_user(db_session: AsyncSession) -> User:
+    """Create an HOD user."""
+    user = User(
+        email="hod@example.com",
+        first_name="HOD",
+        last_name="User",
+        hashed_password=get_password_hash("securepassword123"),
+        role=UserRole.HOD,
+        is_active=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    return user
+
+
+@pytest.fixture
+async def hod_headers(hod_user: User) -> dict[str, str]:
+    """Return Authorization headers for the HOD user."""
+    token = create_access_token(subject=str(hod_user.id))
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -214,3 +316,17 @@ async def test_user(db_session: AsyncSession) -> User:
     db_session.add(user)
     await db_session.commit()
     return user
+
+
+@pytest.fixture
+def get_auth_headers(async_client: AsyncClient):
+    """Returns an async function that generates auth headers via login."""
+    async def _get_auth_headers(email: str, password: str) -> dict[str, str]:
+        response = await async_client.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": password}
+        )
+        assert response.status_code == 200, f"Login failed: {response.text}"
+        token = response.json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+    return _get_auth_headers

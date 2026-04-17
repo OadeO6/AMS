@@ -118,6 +118,31 @@ class AuthService:
         """
         await self._token_repo.revoke(refresh_token)
 
+    async def forgot_password(self, email: str) -> str | None:
+        """Issue a password reset token for an email.
+        Returns the token if the user exists, else None.
+        """
+        user = await self._user_repo.get_by_email(email.lower())
+        if not user or not user.is_active:
+            return None
+        return await self._token_repo.store_reset_token(user.email)
+
+    async def reset_password(self, token: str, new_password: str) -> None:
+        """Verify token and update password."""
+        from app.core.security import get_password_hash
+        from app.exceptions import UnauthorizedError
+
+        email = await self._token_repo.verify_reset_token(token)
+        if not email:
+            raise UnauthorizedError("Invalid or expired reset token", error_code="INVALID_RESET_TOKEN")
+
+        user = await self._user_repo.get_by_email(email)
+        if not user:
+            raise UnauthorizedError("Invalid or expired reset token", error_code="INVALID_RESET_TOKEN")
+
+        hashed = get_password_hash(new_password)
+        await self._user_repo.update(user, hashed_password=hashed)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------

@@ -18,10 +18,15 @@ from app.config import settings
 from app.core.redis import redis_pool
 
 _KEY_PREFIX = "refresh_token"
+_RESET_KEY_PREFIX = "reset_token"
 
 
 def _key(token: str) -> str:
     return f"{_KEY_PREFIX}:{token}"
+
+
+def _reset_key(token: str) -> str:
+    return f"{_RESET_KEY_PREFIX}:{token}"
 
 
 class RefreshTokenRepository:
@@ -52,3 +57,23 @@ class RefreshTokenRepository:
     async def revoke(self, token: str) -> None:
         """Delete the refresh token from Redis (immediate invalidation)."""
         await redis_pool.delete(_key(token))
+
+    async def store_reset_token(self, email: str) -> str:
+        """Create a new password reset token and persist it with a short TTL."""
+        token = str(uuid.uuid4())
+        # e.g. 1 hour TTL
+        ttl_seconds = 3600
+        await redis_pool.setex(
+            name=_reset_key(token),
+            time=ttl_seconds,
+            value=email,
+        )
+        return token
+
+    async def verify_reset_token(self, token: str) -> str | None:
+        """Return the email linked to the reset token, deleting it on use."""
+        key = _reset_key(token)
+        email = await redis_pool.get(key)
+        if email:
+            await redis_pool.delete(key)
+        return email

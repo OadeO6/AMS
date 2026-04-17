@@ -85,6 +85,17 @@ class ForbiddenError(AppException):
         )
 
 
+class ValidationError(AppException):
+    """Raised when request data fails domain-level validation (not schema validation)."""
+
+    def __init__(self, detail: str = "Validation error", error_code: str = "VALIDATION_ERROR") -> None:
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=detail,
+            error_code=error_code,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Global Handlers (registered in main.py)
 # ---------------------------------------------------------------------------

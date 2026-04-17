@@ -139,6 +139,25 @@ class UserService:
         update_data = payload.model_dump(exclude_unset=True, exclude_none=False)
         return await self.repo.update(user, **update_data)
 
+    async def update_student_profile(self, user_id: uuid.UUID, payload: StudentUpdate) -> User:
+        """Update student-specific profile fields.
+
+        Raises
+        ------
+        NotFoundError
+            If user not found.
+        ForbiddenError
+            If the user is not a student.
+        """
+        user = await self.get_user_or_404(user_id)
+        if user.role != UserRole.STUDENT:
+            raise ForbiddenError(
+                detail="Only students can update student profile fields",
+                error_code="FORBIDDEN",
+            )
+        update_data = payload.model_dump(exclude_unset=True, exclude_none=False)
+        return await self.repo.update(user, **update_data)
+
     async def change_password(self, user_id: uuid.UUID, payload: PasswordUpdate) -> None:
         """Change the user's password after verifying the current one.
 
@@ -156,3 +175,42 @@ class UserService:
             )
         hashed = get_password_hash(payload.new_password)
         await self.repo.update(user, hashed_password=hashed)
+
+    # ------------------------------------------------------------------
+    # Admin / HOD Actions
+    # ------------------------------------------------------------------
+
+    async def list_users(
+        self,
+        *,
+        role: UserRole | None = None,
+        department_id: uuid.UUID | None = None,
+        search: str | None = None,
+        page: int = 1,
+        limit: int = 20,
+    ) -> tuple[int, list[User]]:
+        """List users with pagination and optional filtering."""
+        skip = max(0, page - 1) * limit
+        return await self.repo.list_users(
+            role=role.value if role else None,
+            department_id=department_id,
+            search=search,
+            skip=skip,
+            limit=limit,
+        )
+
+    async def authorize_lecturer(self, user_id: uuid.UUID) -> User:
+        """Authorize a lecturer account."""
+        user = await self.get_user_or_404(user_id)
+        if user.role != UserRole.LECTURER:
+            raise ConflictError(detail="Only lecturers can be authorized", error_code="NOT_A_LECTURER")
+        if user.is_authorized:
+            raise ConflictError(detail="Lecturer is already authorized", error_code="ALREADY_AUTHORIZED")
+        return await self.repo.update(user, is_authorized=True)
+
+    async def update_level_offset(self, student_id: uuid.UUID, offset: int) -> User:
+        """Update a student's level offset."""
+        user = await self.get_user_or_404(student_id)
+        if user.role != UserRole.STUDENT:
+            raise ConflictError(detail="User is not a student", error_code="NOT_A_STUDENT")
+        return await self.repo.update(user, level_offset=offset)

@@ -19,18 +19,14 @@ from app.exceptions import ForbiddenError
 async def require_active_semester(
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
-    """Raise 403 if there is no currently active semester.
-
-    Phase 1 stub — always raises ForbiddenError until Phase 3 wires the
-    real Semester query.
-    """
-    # Phase 3 will replace this with:
-    #   stmt = select(Semester).where(Semester.is_active.is_(True)).limit(1)
-    #   active = await session.scalar(stmt)
-    #   if active is None:
-    #       raise ForbiddenError("No active semester", error_code="NO_ACTIVE_SEMESTER")
-    _ = session  # session will be used in Phase 3
-    raise ForbiddenError(
-        detail="No active semester. Write operations are disabled.",
-        error_code="NO_ACTIVE_SEMESTER",
-    )
+    """Raise 403 if there is no currently active semester."""
+    from sqlalchemy import select
+    from app.models.academic_session import Semester
+    
+    stmt = select(Semester).where(Semester.is_active.is_(True)).limit(1)
+    active = await session.scalar(stmt)
+    if active is None:
+        raise ForbiddenError(
+            detail="No active semester. Write operations are disabled.",
+            error_code="NO_ACTIVE_SEMESTER"
+        )

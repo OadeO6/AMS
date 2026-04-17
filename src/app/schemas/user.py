@@ -57,6 +57,12 @@ class LecturerUpdate(BaseModel):
     staff_id: str | None = Field(default=None, max_length=100)
 
 
+class StudentUpdate(BaseModel):
+    """Student-specific profile update for PATCH /auth/me/student."""
+
+    admission_year: int | None = Field(default=None, ge=1900, le=2100)
+
+
 class PasswordUpdate(BaseModel):
     """Payload for PATCH /auth/me/password."""
 
@@ -88,3 +94,30 @@ class UserPublic(BaseModel):
     staff_id: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class AuthorizeStaffRequest(BaseModel):
+    """Payload to authorize a lecturer account (Admin only)."""
+
+    user_id: uuid.UUID
+
+
+class LevelOffsetRequest(BaseModel):
+    """Payload to update a student's level offset (HOD only)."""
+
+    level_offset: int
+
+
+class UserPagination(BaseModel):
+    """Metadata for paginated responses."""
+
+    page: int
+    limit: int
+    total: int
+
+
+class UserListResponse(BaseModel):
+    """Paginated list of users."""
+
+    users: list[UserPublic]
+    pagination: UserPagination

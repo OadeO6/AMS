@@ -25,6 +25,12 @@ One entry per meaningful change — no prose, just facts.
 
 | Date | File(s) | Change |
 |------|---------|--------|
+| 2026-04-17 | `ENDPOINTS.md` | Phase 8 — Marked Student/Lecturer Analytics and AI Tutor endpoints as `[x]` implemented |
+| 2026-04-16 | `ENDPOINTS.md` | Phase 7 — Marked remaining Shared/HOD/Auth endpoints as `[x]` implemented |
+| 2026-04-16 | `ENDPOINTS.md` | Phase 6 — Marked all Student academic endpoints as `[x]` implemented |
+| 2026-04-16 | `ENDPOINTS.md` | Phase 5 — Marked all Lecturer endpoints (courses, students, materials, sessions, tasks, questions, submissions, announcements, gradebook) as `[x]` implemented |
+| 2026-04-16 | `ENDPOINTS.md` | Phase 4 — Marked all HOD course/offering and Student course/register endpoints as `[x]` implemented |
+| 2026-04-16 | `ENDPOINTS_DETAIL.md`, `DOC_HISTORY.md` | Populated full request/response schemas for Admin faculties, departments, and academic sessions endpoints. |
 | 2026-04-16 | `ENDPOINTS_DETAIL.md`, `DOC_HISTORY.md` | Phase 1 — Populated Auth section with full specs for all 11 auth endpoints (register/student, register/lecturer, login, logout, refresh, forgot-password, reset-password, GET/PATCH /me, PATCH /me/student, /me/lecturer, /me/password) |
 | 2026-04-16 | `ARCHITECTURE.md`, `DOC_HISTORY.md` | Comprehensive update to architecture: stack versions, refined structure, and key design decisions |
 | 2026-04-16 | `ARCHITECTURE.md`, `ENDPOINTS.md`, `ENDPOINTS_DETAIL.md`, `DOC_HISTORY.md` | Restructured docs: separated About from instructions, added sync requirements, created detailed endpoint spec file and this history log |

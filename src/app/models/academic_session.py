@@ -14,7 +14,7 @@ from enum import StrEnum
 
 from sqlalchemy import Boolean, Date, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 
@@ -39,6 +39,13 @@ class AcademicSession(Base, TimestampMixin):
         nullable=False,
         unique=True,
         doc='e.g. "2024/2025"',
+    )
+    
+    semesters: Mapped[list[Semester]] = relationship(
+        "Semester",
+        back_populates="academic_session",
+        order_by="Semester.start_date",
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:
@@ -78,6 +85,10 @@ class Semester(Base):
         default=False,
         server_default="false",
         doc="Only one Semester may be active globally.",
+    )
+
+    academic_session: Mapped[AcademicSession] = relationship(
+        "AcademicSession", back_populates="semesters"
     )
 
     def __repr__(self) -> str:

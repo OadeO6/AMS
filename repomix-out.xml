@@ -1,0 +1,5360 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files and files not matching ignore patterns, combined into a single document by Repomix.
+The content has been processed where content has been compressed (code blocks are separated by ⋮---- delimiter).
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: docs/ENDPOINTS_DETAIL.md, src/app/api/**, src/app/services/**, src/app/schemas/**, src/app/repositories/**, src/app/models/**, src/app/dependencies.py, src/app/exceptions.py
+- Files matching these patterns are excluded: **/__pycache__/**, **/*.pyc, uv.lock, alembic/**, tests/**, docs/repomix-output.xml
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Content has been compressed - code blocks are separated by ⋮---- delimiter
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+docs/
+  ENDPOINTS_DETAIL.md
+src/
+  app/
+    api/
+      v1/
+        __init__.py
+        admin.py
+        auth.py
+        health.py
+        hod.py
+        lecturer.py
+        shared.py
+        student.py
+      __init__.py
+      router.py
+    models/
+      __init__.py
+      academic_session.py
+      announcement.py
+      base.py
+      class_session.py
+      course.py
+      department.py
+      faculty.py
+      gradebook.py
+      material.py
+      notification.py
+      task.py
+      user.py
+    repositories/
+      __init__.py
+      academic.py
+      announcement.py
+      base.py
+      course.py
+      department.py
+      faculty.py
+      gradebook.py
+      material.py
+      notification.py
+      session.py
+      task.py
+      token.py
+      user.py
+    schemas/
+      __init__.py
+      admin.py
+      ai_tutor.py
+      analytics.py
+      announcement.py
+      auth.py
+      course.py
+      gradebook.py
+      material.py
+      notification.py
+      session.py
+      student.py
+      task.py
+      user.py
+    services/
+      __init__.py
+      admin.py
+      ai_tutor.py
+      analytics.py
+      auth.py
+      course.py
+      lecturer.py
+      shared.py
+      storage.py
+      student.py
+      user.py
+    dependencies.py
+    exceptions.py
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/app/repositories/academic.py">
+# src/app/repositories/academic.py
+⋮----
+class AcademicSessionRepository(BaseRepository[AcademicSession])
+⋮----
+"""Async repository for the `academic_sessions` table."""
+⋮----
+def __init__(self, session: AsyncSession) -> None
+⋮----
+async def get_by_name(self, name: str) -> AcademicSession | None
+⋮----
+result = await self._session.scalars(
+⋮----
+async def get_with_semesters(self, session_id: uuid.UUID) -> AcademicSession | None
+⋮----
+"""Returns the session with its semesters eagerness-loaded."""
+⋮----
+async def list_all_with_semesters(self) -> Sequence[AcademicSession]
+⋮----
+"""Returns all sessions eagerly loading their semesters."""
+⋮----
+class SemesterRepository(BaseRepository[Semester])
+⋮----
+"""Async repository for the `semesters` table."""
+⋮----
+async def deactivate_all(self) -> None
+⋮----
+"""Ensure no semester is globally active."""
+stmt = update(Semester).where(Semester.is_active == True).values(is_active=False)
+⋮----
+async def get_active_semester(self) -> Semester | None
+⋮----
+"""Returns the globally active semester."""
+⋮----
+async def activate(self, semester_id: uuid.UUID) -> Semester | None
+⋮----
+"""Activate the specified semester and deactivate all others."""
+⋮----
+# Now activate the specified one
+semester = await self.get_by_id(semester_id)
+</file>
+
+<file path="src/app/repositories/announcement.py">
+"""Repository for Announcement model."""
+⋮----
+class AnnouncementRepository(BaseRepository[Announcement])
+⋮----
+def __init__(self, session) -> None
+⋮----
+query = select(Announcement).where(Announcement.offering_id == offering_id)
+⋮----
+query = query.where(Announcement.pinned.is_(True))
+query = query.order_by(Announcement.created_at.desc())
+result = await self._session.scalars(query)
+⋮----
+class AnnouncementViewRepository(BaseRepository[AnnouncementView])
+⋮----
+query = select(AnnouncementView).where(
+</file>
+
+<file path="src/app/repositories/course.py">
+# src/app/repositories/course.py
+"""
+Repository layer for Course, CourseOffering, and CourseRegistration.
+"""
+⋮----
+class CourseRepository(BaseRepository[Course])
+⋮----
+def __init__(self, session)
+⋮----
+async def get_by_code(self, code: str) -> Course | None
+⋮----
+"""Find a course by its unique code."""
+query = select(Course).where(Course.code == code)
+⋮----
+async def list_by_department(self, department_id: uuid.UUID) -> Sequence[Course]
+⋮----
+"""List all course definitions for a given department."""
+query = select(Course).where(Course.department_id == department_id).order_by(Course.code)
+result = await self._session.scalars(query)
+⋮----
+async def get_with_offerings(self, course_id: uuid.UUID) -> Course | None
+⋮----
+"""Fetch a course definition along with its offerings."""
+# Typically needed for HOD detailed view, depending on how Deep we want to query
+⋮----
+class CourseOfferingRepository(BaseRepository[CourseOffering])
+⋮----
+"""Ensure duplicate offerings aren't created for the same semester."""
+query = select(CourseOffering).where(
+⋮----
+async def list_by_course(self, course_id: uuid.UUID) -> Sequence[CourseOffering]
+⋮----
+"""List all offerings for a specific course."""
+query = select(CourseOffering).where(CourseOffering.course_id == course_id)
+⋮----
+async def list_by_semester(self, semester_id: uuid.UUID) -> Sequence[CourseOffering]
+⋮----
+"""List all offerings available in a particular semester."""
+query = select(CourseOffering).where(CourseOffering.semester_id == semester_id)
+⋮----
+async def get_details(self, offering_id: uuid.UUID) -> CourseOffering | None
+⋮----
+"""Could be used to eagerly load lecturer/course etc."""
+⋮----
+class CourseRegistrationRepository(BaseRepository[CourseRegistration])
+⋮----
+"""Check if student is already registered."""
+query = select(CourseRegistration).where(
+⋮----
+async def list_by_student(self, student_id: uuid.UUID) -> Sequence[CourseRegistration]
+⋮----
+"""Get all registrations for a student."""
+query = select(CourseRegistration).where(CourseRegistration.student_id == student_id)
+⋮----
+async def list_by_offering(self, offering_id: uuid.UUID) -> Sequence[CourseRegistration]
+⋮----
+"""List registrations for an offering (useful for lecturers)."""
+query = select(CourseRegistration).where(CourseRegistration.offering_id == offering_id)
+</file>
+
+<file path="src/app/repositories/department.py">
+# src/app/repositories/department.py
+⋮----
+class DepartmentRepository(BaseRepository[Department])
+⋮----
+"""Async repository for the `departments` table."""
+⋮----
+def __init__(self, session: AsyncSession) -> None
+⋮----
+async def get_by_code(self, code: str) -> Department | None
+⋮----
+result = await self._session.scalars(
+⋮----
+async def list_by_faculty(self, faculty_id: uuid.UUID) -> Sequence[Department]
+</file>
+
+<file path="src/app/repositories/faculty.py">
+# src/app/repositories/faculty.py
+⋮----
+class FacultyRepository(BaseRepository[Faculty])
+⋮----
+"""Async repository for the `faculties` table."""
+⋮----
+def __init__(self, session: AsyncSession) -> None
+⋮----
+async def get_by_code(self, code: str) -> Faculty | None
+⋮----
+result = await self._session.scalars(select(Faculty).where(Faculty.code == code).limit(1))
+</file>
+
+<file path="src/app/repositories/gradebook.py">
+"""Repository for GradebookEntry model."""
+⋮----
+class GradebookRepository(BaseRepository[GradebookEntry])
+⋮----
+def __init__(self, session) -> None
+⋮----
+async def list_by_offering(self, offering_id: uuid.UUID) -> Sequence[GradebookEntry]
+⋮----
+result = await self._session.scalars(
+</file>
+
+<file path="src/app/repositories/material.py">
+"""Repository for Material model."""
+⋮----
+class MaterialRepository(BaseRepository[Material])
+⋮----
+def __init__(self, session) -> None
+⋮----
+async def list_by_offering(self, offering_id: uuid.UUID) -> Sequence[Material]
+⋮----
+result = await self._session.scalars(
+</file>
+
+<file path="src/app/repositories/notification.py">
+# src/app/repositories/notification.py
+⋮----
+class NotificationRepository
+⋮----
+"""Repository for managing Notification models."""
+⋮----
+def __init__(self, session: AsyncSession)
+⋮----
+"""List notifications for a matching user optionally filtered by read status."""
+query = select(Notification).where(Notification.user_id == user_id)
+⋮----
+query = query.where(Notification.read == read)
+⋮----
+# Get count
+⋮----
+count_query = select(func.count()).select_from(query.subquery())
+total = await self.session.scalar(count_query) or 0
+⋮----
+# Get results
+offset = (page - 1) * limit
+results = await self.session.scalars(
+⋮----
+async def get_unread_count(self, user_id: uuid.UUID) -> int
+⋮----
+query = select(func.count(Notification.id)).where(
+⋮----
+Notification.user_id == user_id, Notification.read == False  # noqa: E712
+⋮----
+async def get_by_id(self, user_id: uuid.UUID, notification_id: uuid.UUID) -> Notification | None
+⋮----
+query = select(Notification).where(
+⋮----
+async def mark_read(self, notification: Notification) -> Notification
+⋮----
+notification = Notification(user_id=user_id, message=message, type=type, link=link)
+</file>
+
+<file path="src/app/repositories/session.py">
+"""Repositories for ClassSession and Attendance models."""
+⋮----
+class ClassSessionRepository(BaseRepository[ClassSession])
+⋮----
+def __init__(self, session) -> None
+⋮----
+async def list_by_offering(self, offering_id: uuid.UUID) -> Sequence[ClassSession]
+⋮----
+result = await self._session.scalars(
+⋮----
+class AttendanceRepository(BaseRepository[Attendance])
+⋮----
+async def list_by_session(self, session_id: uuid.UUID) -> Sequence[Attendance]
+⋮----
+existing = await self.get_by_student_and_session(student_id, session_id)
+</file>
+
+<file path="src/app/repositories/task.py">
+"""Repositories for Task, Question, Submission, and Answer models."""
+⋮----
+class TaskRepository(BaseRepository[Task])
+⋮----
+def __init__(self, session) -> None
+⋮----
+async def list_by_offering(self, offering_id: uuid.UUID) -> Sequence[Task]
+⋮----
+result = await self._session.scalars(
+⋮----
+class QuestionRepository(BaseRepository[Question])
+⋮----
+async def list_by_task(self, task_id: uuid.UUID) -> Sequence[Question]
+⋮----
+result = await self._session.scalars(select(Question).where(Question.task_id == task_id))
+⋮----
+class SubmissionRepository(BaseRepository[Submission])
+⋮----
+query = select(Submission).where(Submission.task_id == task_id)
+⋮----
+query = query.where(Submission.grading_status != "ungraded")
+⋮----
+query = query.where(Submission.grading_status == "ungraded")
+result = await self._session.scalars(query)
+⋮----
+async def list_ai_draft(self, task_id: uuid.UUID) -> Sequence[Submission]
+⋮----
+class AnswerRepository(BaseRepository[Answer])
+⋮----
+async def list_by_submission(self, submission_id: uuid.UUID) -> Sequence[Answer]
+</file>
+
+<file path="src/app/schemas/admin.py">
+# src/app/schemas/admin.py
+"""
+Pydantic v2 schemas for the Admin-only domains (Faculty, Department, Session).
+"""
+⋮----
+# ---------------------------------------------------------------------------
+# Faculties
+⋮----
+class FacultyCreate(BaseModel)
+⋮----
+name: str = Field(..., max_length=200)
+code: str = Field(..., max_length=20)
+⋮----
+class FacultyUpdate(BaseModel)
+⋮----
+name: str | None = Field(default=None, max_length=200)
+code: str | None = Field(default=None, max_length=20)
+⋮----
+class FacultyResponse(BaseModel)
+⋮----
+model_config = ConfigDict(from_attributes=True)
+⋮----
+id: uuid.UUID
+name: str
+code: str
+created_at: datetime
+updated_at: datetime
+⋮----
+# Departments
+⋮----
+class DepartmentCreate(BaseModel)
+⋮----
+class DepartmentUpdate(BaseModel)
+⋮----
+class AssignHODRequest(BaseModel)
+⋮----
+hod_id: uuid.UUID
+⋮----
+class DepartmentResponse(BaseModel)
+⋮----
+faculty_id: uuid.UUID
+⋮----
+hod_id: uuid.UUID | None
+⋮----
+# Academic Calendar - Semesters
+⋮----
+class SemesterCreate(BaseModel)
+⋮----
+name: str = Field(..., max_length=10)  # e.g., "first" or "second"
+start_date: date
+end_date: date
+⋮----
+class SemesterUpdate(BaseModel)
+⋮----
+start_date: date | None = None
+end_date: date | None = None
+⋮----
+class SemesterResponse(BaseModel)
+⋮----
+is_active: bool
+⋮----
+# Academic Calendar - Sessions
+⋮----
+class AcademicSessionCreate(BaseModel)
+⋮----
+name: str = Field(..., max_length=20, examples=["2024/2025"])
+semesters: list[SemesterCreate]
+⋮----
+class AcademicSessionUpdate(BaseModel)
+⋮----
+name: str | None = Field(default=None, max_length=20)
+⋮----
+class AcademicSessionResponse(BaseModel)
+⋮----
+semesters: list[SemesterResponse] = []
+</file>
+
+<file path="src/app/schemas/ai_tutor.py">
+"""
+Schemas for AI Tutor Module.
+"""
+⋮----
+class AITutorRequest(BaseModel)
+⋮----
+"""Request payload sent by a student to the AI Tutor."""
+message: str = Field(..., max_length=2000, description="The student's question or prompt.")
+context_material_id: UUID | None = Field(None, description="Optional ID of specific material to constrain the Q/A context.")
+⋮----
+class AITutorResponse(BaseModel)
+⋮----
+"""Response returned by the AI Tutor."""
+reply: str
+tokens_used: int = 0
+⋮----
+class AITutorRuleUpdate(BaseModel)
+⋮----
+"""Payload for a lecturer updating the AI Tutor's guiding rules."""
+rules: str = Field(..., max_length=5000, description="System instructions/rules for the AI to follow (e.g., 'don't give direct answers').")
+</file>
+
+<file path="src/app/schemas/analytics.py">
+"""
+Schemas for Analytics Module.
+"""
+⋮----
+# ---------------------------------------------------------------------------
+# Student Analytics Models
+⋮----
+class StudentCourseAnalytics(BaseModel)
+⋮----
+"""Metrics for a single course from the student's perspective."""
+attendance_percentage: float | None
+average_score: float | None
+total_assignments: int
+completed_assignments: int
+⋮----
+model_config = ConfigDict(from_attributes=True)
+⋮----
+class StudentGlobalAnalytics(BaseModel)
+⋮----
+"""Combined overall metrics for a student across active courses."""
+courses_enrolled: int
+overall_attendance_percentage: float | None
+overall_average_score: float | None
+⋮----
+# Lecturer Analytics Models
+⋮----
+class StudentPerformance(BaseModel)
+⋮----
+"""Sub-model representing a specific student's aggregate performance."""
+student_id: str
+first_name: str
+last_name: str
+⋮----
+class LecturerCourseAnalytics(BaseModel)
+⋮----
+"""Metrics for a single course from the lecturer's perspective."""
+total_students: int
+average_class_score: float | None
+average_class_attendance: float | None
+low_performing_students: list[StudentPerformance]
+⋮----
+class LecturerGlobalAnalytics(BaseModel)
+⋮----
+"""Combined overall metrics for a lecturer across active courses."""
+active_courses: int
+total_students_across_courses: int
+</file>
+
+<file path="src/app/schemas/announcement.py">
+"""Pydantic schemas for Announcement."""
+⋮----
+class AnnouncementCreate(BaseModel)
+⋮----
+title: str
+body: str
+pinned: bool = False
+⋮----
+class AnnouncementUpdate(BaseModel)
+⋮----
+title: str | None = None
+body: str | None = None
+pinned: bool | None = None
+⋮----
+class AnnouncementResponse(BaseModel)
+⋮----
+model_config = ConfigDict(from_attributes=True)
+⋮----
+id: uuid.UUID
+offering_id: uuid.UUID
+lecturer_id: uuid.UUID
+⋮----
+pinned: bool
+created_at: datetime
+updated_at: datetime
+</file>
+
+<file path="src/app/schemas/course.py">
+# src/app/schemas/course.py
+"""
+Pydantic schemas for the Course domain.
+
+Provides validation and serialization for Course definitions,
+Course Offerings, and Registrations.
+"""
+⋮----
+# ---------------------------------------------------------------------------
+# Course Definition Schemas
+⋮----
+class CourseBase(BaseModel)
+⋮----
+title: str = Field(..., min_length=2, max_length=200)
+code: str = Field(..., min_length=2, max_length=20)
+description: str | None = None
+units: int = Field(..., ge=1, le=10)
+⋮----
+class CourseCreate(CourseBase)
+⋮----
+"""Schema for HODs creating a new course definition in their department."""
+⋮----
+class CourseUpdate(BaseModel)
+⋮----
+"""Schema for updating a course definition."""
+⋮----
+title: str | None = Field(None, min_length=2, max_length=200)
+⋮----
+units: int | None = Field(None, ge=1, le=10)
+⋮----
+class CourseResponse(CourseBase)
+⋮----
+id: uuid.UUID
+department_id: uuid.UUID
+⋮----
+model_config = ConfigDict(from_attributes=True)
+⋮----
+# Course Offering Schemas
+⋮----
+class CourseOfferingCreate(BaseModel)
+⋮----
+"""Payload for HODs instantiating a Course for a Semester."""
+⋮----
+semester_id: uuid.UUID
+lecturer_id: uuid.UUID | None = None
+⋮----
+class CourseOfferingResponse(BaseModel)
+⋮----
+course_id: uuid.UUID
+⋮----
+lecturer_id: uuid.UUID | None
+is_active: bool
+⋮----
+class CourseOfferingAssignLecturer(BaseModel)
+⋮----
+"""Payload to assign a primary lecturer to an offering."""
+⋮----
+lecturer_id: uuid.UUID
+⋮----
+# Course Registration Schemas
+⋮----
+class CourseRegistrationResponse(BaseModel)
+⋮----
+offering_id: uuid.UUID
+student_id: uuid.UUID
+status: str
+⋮----
+class CourseRegistrationStatusUpdate(BaseModel)
+⋮----
+"""Lecturer reviewing a registration request."""
+⋮----
+status: str = Field(..., pattern="^(approved|rejected)$")
+</file>
+
+<file path="src/app/schemas/gradebook.py">
+"""Pydantic schemas for Gradebook."""
+⋮----
+class GradebookUpdateRequest(BaseModel)
+⋮----
+manual_grade: str | None = None
+notes: str | None = None
+⋮----
+class GradebookEntryResponse(BaseModel)
+⋮----
+model_config = ConfigDict(from_attributes=True)
+⋮----
+id: uuid.UUID
+offering_id: uuid.UUID
+student_id: uuid.UUID
+manual_grade: str | None
+notes: str | None
+updated_at: datetime
+</file>
+
+<file path="src/app/schemas/material.py">
+"""Pydantic schemas for Material."""
+⋮----
+class MaterialType(StrEnum)
+⋮----
+document = "document"
+video = "video"
+link = "link"
+⋮----
+class MaterialVisibility(StrEnum)
+⋮----
+students_only = "students_only"
+ai_only = "ai_only"
+both = "both"
+⋮----
+class MaterialCreate(BaseModel)
+⋮----
+title: str
+type: MaterialType
+file_url: str
+visibility: MaterialVisibility = MaterialVisibility.students_only
+⋮----
+class MaterialUpdate(BaseModel)
+⋮----
+title: str | None = None
+visibility: MaterialVisibility | None = None
+⋮----
+class MaterialResponse(BaseModel)
+⋮----
+model_config = ConfigDict(from_attributes=True)
+⋮----
+id: uuid.UUID
+offering_id: uuid.UUID
+uploaded_by: uuid.UUID
+⋮----
+visibility: MaterialVisibility
+indexed: bool
+indexed_at: datetime | None
+created_at: datetime
+</file>
+
+<file path="src/app/schemas/notification.py">
+# src/app/schemas/notification.py
+"""
+Pydantic v2 schemas for the Notification domain.
+"""
+⋮----
+class NotificationResponse(BaseModel)
+⋮----
+"""API response schema for a Notification resource."""
+⋮----
+model_config = ConfigDict(from_attributes=True)
+⋮----
+id: uuid.UUID
+message: str
+type: str
+read: bool
+created_at: datetime
+link: str | None
+⋮----
+class NotificationListResponse(BaseModel)
+⋮----
+notifications: list[NotificationResponse]
+unread_count: int
+</file>
+
+<file path="src/app/schemas/session.py">
+"""Pydantic schemas for ClassSession and Attendance."""
+⋮----
+class SessionStatus(StrEnum)
+⋮----
+upcoming = "upcoming"
+completed = "completed"
+cancelled = "cancelled"
+⋮----
+class AttendanceStatus(StrEnum)
+⋮----
+present = "present"
+absent = "absent"
+⋮----
+class ClassSessionCreate(BaseModel)
+⋮----
+title: str
+scheduled_at: datetime
+venue: str | None = None
+notes: str | None = None
+⋮----
+class ClassSessionUpdate(BaseModel)
+⋮----
+title: str | None = None
+scheduled_at: datetime | None = None
+⋮----
+status: SessionStatus | None = None
+⋮----
+class ClassSessionResponse(BaseModel)
+⋮----
+model_config = ConfigDict(from_attributes=True)
+⋮----
+id: uuid.UUID
+offering_id: uuid.UUID
+lecturer_id: uuid.UUID
+⋮----
+venue: str | None
+status: SessionStatus
+notes: str | None
+is_owner: bool = False
+created_at: datetime
+⋮----
+class AttendanceMark(BaseModel)
+⋮----
+student_id: uuid.UUID
+status: AttendanceStatus
+⋮----
+class AttendanceMarkRequest(BaseModel)
+⋮----
+records: list[AttendanceMark]
+⋮----
+class AttendanceResponse(BaseModel)
+⋮----
+session_id: uuid.UUID
+⋮----
+marked_at: datetime
+</file>
+
+<file path="src/app/schemas/student.py">
+"""Pydantic schemas specific to Student views."""
+⋮----
+class StudentTaskDetailResponse(TaskResponse)
+⋮----
+questions: list[QuestionResponse]
+⋮----
+class AnswerSubmit(BaseModel)
+⋮----
+question_id: str
+selected_option: str | None = None
+text_answer: str | None = None
+file_url: str | None = None
+⋮----
+class SubmitTaskRequest(BaseModel)
+⋮----
+answers: list[AnswerSubmit]
+⋮----
+class StudentGradeSummary(BaseModel)
+⋮----
+submissions: list[SubmissionResponse]
+gradebook: GradebookEntryResponse | None
+⋮----
+class StudentAnnouncementResponse(BaseModel)
+⋮----
+model_config = ConfigDict(from_attributes=True)
+⋮----
+id: uuid.UUID
+title: str
+body: str
+pinned: bool
+created_at: datetime
+viewed: bool = False
+</file>
+
+<file path="src/app/schemas/task.py">
+"""Pydantic schemas for Task, Question, Submission, and Answer."""
+⋮----
+class QuestionType(StrEnum)
+⋮----
+mcq = "mcq"
+free_text = "free_text"
+document_upload = "document_upload"
+⋮----
+class GradingStatus(StrEnum)
+⋮----
+ungraded = "ungraded"
+ai_draft = "ai_draft"
+ai_approved = "ai_approved"
+manually_graded = "manually_graded"
+⋮----
+# ---------------------------------------------------------------------------
+# Task
+⋮----
+class TaskCreate(BaseModel)
+⋮----
+title: str
+description: str | None = None
+due_date: datetime
+ai_grading: bool = False
+⋮----
+class TaskUpdate(BaseModel)
+⋮----
+title: str | None = None
+⋮----
+due_date: datetime | None = None
+ai_grading: bool | None = None
+marking_guide_url: str | None = None
+⋮----
+class TaskResponse(BaseModel)
+⋮----
+model_config = ConfigDict(from_attributes=True)
+⋮----
+id: uuid.UUID
+offering_id: uuid.UUID
+⋮----
+description: str | None
+⋮----
+ai_grading: bool
+marking_guide_url: str | None
+created_at: datetime
+⋮----
+# Question
+⋮----
+class QuestionCreate(BaseModel)
+⋮----
+text: str
+type: QuestionType
+score: float
+options: list[str] | None = None
+⋮----
+class QuestionUpdate(BaseModel)
+⋮----
+text: str | None = None
+score: float | None = None
+⋮----
+class QuestionResponse(BaseModel)
+⋮----
+task_id: uuid.UUID
+⋮----
+options: list[str] | None
+⋮----
+# Submission / Grading
+⋮----
+class AnswerGrade(BaseModel)
+⋮----
+answer_id: uuid.UUID
+⋮----
+feedback: str | None = None
+⋮----
+class GradeSubmissionRequest(BaseModel)
+⋮----
+answers: list[AnswerGrade]
+⋮----
+class AnswerResponse(BaseModel)
+⋮----
+question_id: uuid.UUID
+selected_option: str | None
+text_answer: str | None
+file_url: str | None
+score: float | None
+feedback: str | None
+⋮----
+class SubmissionResponse(BaseModel)
+⋮----
+student_id: uuid.UUID
+submitted_at: datetime
+grading_status: GradingStatus
+total_score: float | None
+graded_at: datetime | None
+</file>
+
+<file path="src/app/services/admin.py">
+# src/app/services/admin.py
+"""
+AdminService — orchestration and business logic for top-level admin functions
+(Faculties, Departments, Academic Sessions).
+"""
+⋮----
+class AdminService
+⋮----
+"""Business logic for Administrative operations."""
+⋮----
+def __init__(self, session: AsyncSession) -> None
+⋮----
+# ---------------------------------------------------------------------------
+# Faculty
+⋮----
+async def create_faculty(self, payload: FacultyCreate) -> Faculty
+⋮----
+async def list_faculties(self) -> Sequence[Faculty]
+⋮----
+async def update_faculty(self, faculty_id: uuid.UUID, payload: FacultyUpdate) -> Faculty
+⋮----
+faculty = await self.faculties.get_by_id(faculty_id)
+⋮----
+update_data = payload.model_dump(exclude_unset=True)
+⋮----
+async def delete_faculty(self, faculty_id: uuid.UUID) -> None
+⋮----
+# Ensure no departments exist (or rely on DB ON DELETE RESTRICT)
+# We rely on DB restrictions which will raise IntegrityError that we can catch globally,
+# but manual checking is also good. We'll rely on DB to enforce constraints for less queries.
+⋮----
+# Department
+⋮----
+async def create_department(self, faculty_id: uuid.UUID, payload: DepartmentCreate) -> Department
+⋮----
+fac = await self.faculties.get_by_id(faculty_id)
+⋮----
+async def list_departments_by_faculty(self, faculty_id: uuid.UUID) -> Sequence[Department]
+⋮----
+async def get_department(self, faculty_id: uuid.UUID, department_id: uuid.UUID) -> Department
+⋮----
+dept = await self.departments.get_by_id(department_id)
+⋮----
+dept = await self.get_department(faculty_id, department_id)
+⋮----
+async def delete_department(self, faculty_id: uuid.UUID, department_id: uuid.UUID) -> None
+⋮----
+async def assign_hod(self, department_id: uuid.UUID, user_id: uuid.UUID) -> Department
+⋮----
+user = await self.users.get_by_id(user_id)
+⋮----
+# Set user's department explicitly as well, so their token matches the HOD scoping.
+⋮----
+# Academic sessions and Semesters
+⋮----
+async def create_session(self, payload: AcademicSessionCreate) -> AcademicSession
+⋮----
+session_obj = await self.sessions.create(name=payload.name)
+⋮----
+# Create semesters inside
+⋮----
+# Return eagerly mapped
+full_session = await self.sessions.get_with_semesters(session_obj.id)
+⋮----
+async def list_sessions(self) -> Sequence[AcademicSession]
+⋮----
+async def get_session(self, session_id: uuid.UUID) -> AcademicSession
+⋮----
+sess = await self.sessions.get_with_semesters(session_id)
+⋮----
+async def update_session(self, session_id: uuid.UUID, payload: AcademicSessionUpdate) -> AcademicSession
+⋮----
+sess = await self.get_session(session_id)
+⋮----
+updated = await self.sessions.update(sess, **update_data)
+⋮----
+async def delete_session(self, session_id: uuid.UUID) -> None
+⋮----
+sess = await self.sessions.get_by_id(session_id)
+⋮----
+async def activate_semester(self, session_id: uuid.UUID, semester_id: uuid.UUID) -> Semester
+⋮----
+sess = await self.get_session(session_id)  # Validate it belongs to session implicitly if we checked
+sem = await self.semesters.get_by_id(semester_id)
+⋮----
+sem_updated = await self.semesters.activate(semester_id)
+return sem_updated  # type: ignore
+⋮----
+async def delete_semester(self, session_id: uuid.UUID, semester_id: uuid.UUID) -> None
+</file>
+
+<file path="src/app/services/ai_tutor.py">
+class AITutorService
+⋮----
+def __init__(self, session: AsyncSession) -> None
+⋮----
+async def chat(self, user_id: uuid.UUID, offering_id: uuid.UUID, payload: AITutorRequest) -> AITutorResponse
+⋮----
+"""
+        Processes a chat request against the offering's AI rules.
+        """
+# Load rules if configured
+rule_query = await self.session.execute(
+rule = rule_query.scalar_one_or_none()
+⋮----
+# In a real implementation:
+# 1. We would fetch the material (if context_material_id) to inject into prompt
+# 2. Append `rule.rules` as system instruction
+# 3. Request LLM completion from an external provider (OpenAI API / Local model)
+⋮----
+base_reply = f"Simulated AI Tutor response to: '{payload.message}'."
+⋮----
+async def update_rules(self, offering_id: uuid.UUID, rules: str) -> None
+⋮----
+"""
+        Inserts or updates the AI Tutor rules for a specific offering.
+        """
+⋮----
+rule = AITutorRule(offering_id=offering_id, rules=rules)
+</file>
+
+<file path="src/app/services/analytics.py">
+class AnalyticsService
+⋮----
+def __init__(self, session: AsyncSession) -> None
+⋮----
+async def get_student_course_metrics(self, student_id: uuid.UUID, offering_id: uuid.UUID) -> StudentCourseAnalytics
+⋮----
+# Aggregated attendance via Attendance model linked to ClassSession
+# 1. Total sessions in offering
+total_sessions_query = await self.session.execute(
+total_sessions = total_sessions_query.scalar() or 0
+⋮----
+# 2. Student attendance present count
+attended_query = await self.session.execute(
+attended_sessions = attended_query.scalar() or 0
+attendance_percentage = (attended_sessions / total_sessions * 100) if total_sessions > 0 else None
+⋮----
+# Assignments (total vs completed)
+total_tasks_query = await self.session.execute(
+total_tasks = total_tasks_query.scalar() or 0
+⋮----
+submissions_query = await self.session.execute(
+submissions = submissions_query.scalars().all()
+completed_tasks = len(submissions)
+⋮----
+# Average score
+graded_submissions = [s for s in submissions if s.total_score is not None]
+avg_score = sum(s.total_score for s in graded_submissions) / len(graded_submissions) if graded_submissions else None
+⋮----
+async def get_student_global_metrics(self, student_id: uuid.UUID) -> StudentGlobalAnalytics
+⋮----
+enrolled_query = await self.session.execute(
+enrolled = enrolled_query.scalar() or 0
+⋮----
+overall_attendance_percentage=85.0,  # Stub values for global scope simplicity
+⋮----
+async def get_lecturer_course_metrics(self, offering_id: uuid.UUID) -> LecturerCourseAnalytics
+⋮----
+students_query = await self.session.execute(
+total_students = students_query.scalar() or 0
+⋮----
+# Returning stub dynamic values for lecturer
+⋮----
+async def get_lecturer_global_metrics(self, lecturer_id: uuid.UUID) -> LecturerGlobalAnalytics
+</file>
+
+<file path="src/app/services/course.py">
+# src/app/services/course.py
+"""
+Business logic for Courses, Offerings, and Registrations.
+Enforces rules:
+- HOD scope bounds
+- Active semester checks for registration
+"""
+⋮----
+class CourseService
+⋮----
+"""Orchestrates course management."""
+⋮----
+def __init__(self, session: AsyncSession)
+⋮----
+# -----------------------------------------------------------------------
+# HOD: Course Definitions
+⋮----
+async def create_course(self, hod: User, payload: CourseCreate) -> Course
+⋮----
+"""Create a new course definition in the HOD's department."""
+⋮----
+# Check for duplicate code anywhere (could restrict to dept, but code is globally unique)
+existing = await self.course_repo.get_by_code(payload.code)
+⋮----
+course = await self.course_repo.create(
+⋮----
+async def list_department_courses(self, hod: User) -> Sequence[Course]
+⋮----
+"""List all courses for the HOD's department."""
+⋮----
+async def get_department_course(self, hod: User, course_id: uuid.UUID) -> Course
+⋮----
+"""Fetch a specific course, ensuring it belongs to the HOD's department."""
+course = await self.course_repo.get_by_id(course_id)
+⋮----
+async def update_course(self, hod: User, course_id: uuid.UUID, payload: CourseUpdate) -> Course
+⋮----
+"""Update a course definition."""
+course = await self.get_department_course(hod, course_id)
+⋮----
+update_data = payload.model_dump(exclude_unset=True)
+# Note: BaseRepository doesn't natively have partial update dict support without fetching.
+# We can just mutate and commit.
+⋮----
+async def delete_course(self, hod: User, course_id: uuid.UUID) -> None
+⋮----
+"""Delete a course definition."""
+⋮----
+# Check if offerings exist
+offerings = await self.offering_repo.list_by_course(course.id)
+⋮----
+# HOD: Offerings
+⋮----
+"""Instantiate a course for a specific semester."""
+⋮----
+# Check dupes
+existing = await self.offering_repo.get_by_course_and_semester(
+⋮----
+offering = await self.offering_repo.create(
+⋮----
+"""List all offerings for a specific course."""
+⋮----
+async def get_offering(self, offering_id: uuid.UUID) -> CourseOffering
+⋮----
+offering = await self.offering_repo.get_by_id(offering_id)
+⋮----
+async def activate_offering(self, hod: User, course_id: uuid.UUID, offering_id: uuid.UUID) -> CourseOffering
+⋮----
+# First ensure the HOD owns the course
+⋮----
+offering = await self.get_offering(offering_id)
+⋮----
+async def assign_lecturer(self, hod: User, course_id: uuid.UUID, offering_id: uuid.UUID, lecturer_id: uuid.UUID) -> CourseOffering
+⋮----
+# Optional: could check if lecturer exists and is authorized
+⋮----
+async def unassign_lecturer(self, hod: User, course_id: uuid.UUID, offering_id: uuid.UUID, lecturer_id: uuid.UUID) -> None
+⋮----
+# Student / Shared: Registration & Discovery
+⋮----
+async def list_available_offerings(self) -> Sequence[CourseOffering]
+⋮----
+"""List active offerings for the globally active semester."""
+⋮----
+sem_repo = SemesterRepository(self.session)
+active_semester = await sem_repo.get_active_semester()
+⋮----
+async def list_student_offerings(self, student: User, semester_id: uuid.UUID | None = None) -> Sequence[CourseOffering]
+⋮----
+"""List course offerings the student is registered for."""
+regs = await self.registration_repo.list_by_student(student.id)
+offering_ids = [r.offering_id for r in regs]
+⋮----
+offerings = []
+# A more optimal implementation would be a join in the repository.
+# But for Phase 4 we can instantiate individually.
+⋮----
+off = await self.get_offering(oid)
+⋮----
+async def get_registration(self, student: User, offering_id: uuid.UUID) -> CourseRegistration
+⋮----
+reg = await self.registration_repo.get_by_student_and_offering(student.id, offering_id)
+⋮----
+async def register_student(self, student: User, offering_id: uuid.UUID) -> CourseRegistration
+⋮----
+"""Student registers for an active offering."""
+⋮----
+existing = await self.registration_repo.get_by_student_and_offering(
+⋮----
+reg = await self.registration_repo.create(
+⋮----
+async def unregister_student(self, student: User, offering_id: uuid.UUID) -> None
+⋮----
+"""Drop a course."""
+⋮----
+async def list_student_registrations(self, student: User) -> Sequence[CourseRegistration]
+</file>
+
+<file path="src/app/services/lecturer.py">
+"""Business logic for Lecturer-facing operations.
+
+Enforces:
+- Offering access: lecturer must be assigned to the offering (offering.lecturer_id == lecturer.id)
+- Session ownership: only the creating lecturer may edit/cancel/mark attendance
+- Material indexing: students_only materials cannot be indexed
+- AI grading: requires marking_guide_url to be set first
+"""
+⋮----
+class LecturerService
+⋮----
+"""Orchestrates all lecturer domain logic."""
+⋮----
+def __init__(self, session: AsyncSession) -> None
+⋮----
+# -----------------------------------------------------------------------
+# Guard helpers
+⋮----
+async def get_assigned_offering(self, lecturer: User, offering_id: uuid.UUID) -> CourseOffering
+⋮----
+"""Return offering only if this lecturer is assigned to it."""
+offering = await self.offering_repo.get_by_id(offering_id)
+⋮----
+async def get_owned_session(self, lecturer: User, session_id: uuid.UUID) -> ClassSession
+⋮----
+"""Return session only if this lecturer owns it."""
+sess = await self.session_repo.get_by_id(session_id)
+⋮----
+# Courses
+⋮----
+async def list_courses(self, lecturer: User) -> Sequence[CourseOffering]
+⋮----
+"""List all offerings the lecturer is assigned to."""
+⋮----
+sem_repo = SemesterRepository(self._session)
+active_semester = await sem_repo.get_active_semester()
+⋮----
+result = await self._session.scalars(
+⋮----
+async def get_course(self, lecturer: User, offering_id: uuid.UUID) -> CourseOffering
+⋮----
+# Students
+⋮----
+async def list_students(self, lecturer: User, offering_id: uuid.UUID)
+⋮----
+async def approve_student(self, lecturer: User, offering_id: uuid.UUID, student_id: uuid.UUID)
+⋮----
+reg = await self.registration_repo.get_by_student_and_offering(student_id, offering_id)
+⋮----
+# Materials
+⋮----
+material = await self.material_repo.get_by_id(material_id)
+⋮----
+updates = payload.model_dump(exclude_none=True)
+⋮----
+# Class Sessions
+⋮----
+sess = await self.get_owned_session(lecturer, session_id)
+⋮----
+async def list_sessions(self, lecturer: User, offering_id: uuid.UUID) -> Sequence[ClassSession]
+⋮----
+results = []
+⋮----
+att = await self.attendance_repo.upsert_attendance(
+⋮----
+# Announcements
+⋮----
+ann = await self.announcement_repo.get_by_id(announcement_id)
+⋮----
+ann = await self.get_announcement(lecturer, offering_id, announcement_id)
+⋮----
+# Tasks
+⋮----
+async def get_task(self, lecturer: User, offering_id: uuid.UUID, task_id: uuid.UUID) -> Task
+⋮----
+task = await self.task_repo.get_by_id(task_id)
+⋮----
+async def list_tasks(self, lecturer: User, offering_id: uuid.UUID) -> Sequence[Task]
+⋮----
+task = await self.get_task(lecturer, offering_id, task_id)
+⋮----
+# Guard: enabling AI grading requires marking guide
+⋮----
+async def delete_task(self, lecturer: User, offering_id: uuid.UUID, task_id: uuid.UUID) -> None
+⋮----
+# Questions
+⋮----
+question = await self.question_repo.get_by_id(question_id)
+⋮----
+# Submissions
+⋮----
+sub = await self.submission_repo.get_by_id(submission_id)
+⋮----
+sub = await self.get_submission(lecturer, offering_id, task_id, submission_id)
+total = 0.0
+⋮----
+answer = await self.answer_repo.get_by_id(answer_grade.answer_id)
+⋮----
+drafts = await self.submission_repo.list_ai_draft(task_id)
+⋮----
+# Gradebook
+⋮----
+entry = await self.gradebook_repo.get_by_student_and_offering(student_id, offering_id)
+⋮----
+entry = await self.gradebook_repo.create(
+⋮----
+updates = {}
+⋮----
+entry = await self.gradebook_repo.update(entry, **updates)
+</file>
+
+<file path="src/app/services/shared.py">
+# src/app/services/shared.py
+⋮----
+class SharedService
+⋮----
+"""Service layer for shared endpoints (accessible by multiple roles)."""
+⋮----
+def __init__(self, session: AsyncSession)
+⋮----
+async def mark_notification_read(self, user: User, notification_id: uuid.UUID) -> Notification
+⋮----
+notification = await self.notification_repo.get_by_id(user.id, notification_id)
+⋮----
+async def get_material_download_url(self, user: User, material_id: uuid.UUID) -> str
+⋮----
+"""Return a URL or construct logic to download a material, enforcing access."""
+material = await self.material_repo.get_by_id(material_id)
+⋮----
+offering = await self.offering_repo.get_by_id(material.offering_id)
+⋮----
+# Validate access
+⋮----
+reg = await self.registration_repo.get_by_student_and_offering(user.id, offering.id)
+⋮----
+svc = StorageService()
+⋮----
+# If it's a full URL (like local mock), return it. Otherwise generate presigned URL.
+</file>
+
+<file path="src/app/services/storage.py">
+# We use standard synchronous boto3 for simple bucket uploads here,
+# wrapped in generic exceptions for the API. In a highly loaded API,
+# a library like `aioboto3` would be used for full async.
+⋮----
+class StorageService
+⋮----
+def __init__(self) -> None
+⋮----
+def upload_file(self, file_obj: BinaryIO, filename: str, content_type: str = "application/octet-stream") -> str
+⋮----
+"""
+        Uploads a file to S3 and returns the relative path or URL.
+        If S3 is not configured, returns a mock local URL.
+        """
+⋮----
+# Fallback for local development if keys aren't set
+unique_filename = f"local-storage/{uuid.uuid4()}-{filename}"
+⋮----
+object_name = f"uploads/{uuid.uuid4()}-{filename}"
+⋮----
+# Example representation of an S3 URL
+⋮----
+def generate_presigned_url(self, object_name: str, expiration: int = 3600) -> str
+⋮----
+"""
+        Generates a presigned URL to securely download a file.
+        """
+⋮----
+return object_name # Just return the mock local path
+⋮----
+response = self.s3.generate_presigned_url(
+</file>
+
+<file path="src/app/services/student.py">
+"""Business logic for Student-facing operations.
+
+Enforces:
+- Registration: student must be an approved registrant in the offering
+- Visibility: materials must be students_only or both
+"""
+⋮----
+class StudentService
+⋮----
+"""Orchestrates all student domain logic."""
+⋮----
+def __init__(self, session: AsyncSession) -> None
+⋮----
+# -----------------------------------------------------------------------
+# Guard helpers
+⋮----
+"""Return the registration if the student is approved for this offering."""
+offering = await self.offering_repo.get_by_id(offering_id)
+⋮----
+reg = await self.registration_repo.get_by_student_and_offering(student.id, offering_id)
+⋮----
+# Materials
+⋮----
+"""List materials that are visible to students."""
+⋮----
+query = select(Material).where(
+⋮----
+query = query.where(Material.type == type_)
+query = query.order_by(Material.created_at.desc())
+⋮----
+result = await self._session.scalars(query)
+⋮----
+# Tasks & Submissions
+⋮----
+"""List all tasks for the offering."""
+⋮----
+# Note: In a complete implementation, 'status' filtering (upcoming, ungraded etc)
+# requires complex joins with Submission. For now we fetch all tasks.
+⋮----
+"""Get a single task along with its questions."""
+⋮----
+task = await self.task_repo.get_by_id(task_id)
+⋮----
+questions = await self.question_repo.list_by_task(task_id)
+⋮----
+response_data = {
+⋮----
+"""Submit answers for a task."""
+⋮----
+# Ensure no existing submission
+existing = await self._session.scalars(
+⋮----
+# Create submission
+grading_status = "ai_draft" if task.ai_grading else "ungraded"
+sub = await self.submission_repo.create(
+⋮----
+# Grades
+⋮----
+"""Fetch all graded submissions and overall gradebook entry."""
+⋮----
+# Submissions that are finalized
+query = select(Submission).join(Task).where(
+submissions = (await self._session.scalars(query)).all()
+⋮----
+gradebook_entry = await self.gradebook_repo.get_by_student_and_offering(student.id, offering_id)
+⋮----
+# Announcements
+⋮----
+"""List announcements."""
+⋮----
+"""Get a single announcement."""
+⋮----
+ann = await self.announcement_repo.get_by_id(announcement_id)
+⋮----
+"""Mark an announcement as read."""
+⋮----
+view = await self.announcement_view_repo.get_by_student_and_announcement(student.id, announcement_id)
+⋮----
+# Class Sessions
+⋮----
+"""List class sessions."""
+⋮----
+query = select(ClassSession).where(ClassSession.offering_id == offering_id)
+⋮----
+query = query.where(ClassSession.status == status)
+query = query.order_by(ClassSession.scheduled_at.asc())
+⋮----
+"""Get session details and specific attendance for the student."""
+⋮----
+sess = await self.session_repo.get_by_id(session_id)
+⋮----
+att = await self._session.scalars(
+⋮----
+"""Get all attendance records for the student in this offering."""
+⋮----
+query = select(Attendance).join(ClassSession).where(
+</file>
+
+<file path="docs/ENDPOINTS_DETAIL.md">
+# Endpoint Specifications — Detailed
+
+---
+
+## About
+
+This file contains the **full specification** for every AMS API endpoint.
+For a concise route-list overview, see `ENDPOINTS.md`.
+
+---
+
+## Developer Instructions
+
+> **How to update:** When an endpoint is added, modified, or removed:
+> 1. Update the route list in **`ENDPOINTS.md`** immediately.
+> 2. Update or add the full spec entry here in **this file**.
+> 3. Log the change in **`DOC_HISTORY.md`**.
+>
+> **Keep in sync with:** `ENDPOINTS.md` — the route list there must always match the entries here.
+> This file is the source of truth for request/response shapes, query params, body fields, and error codes.
+
+---
+
+## Auth
+
+<details>
+<summary><strong>POST /auth/register/lecturer</strong> — Register new lecturer</summary>
+
+**Request Body:**
+```json
+{
+  "firstName": "string",
+  "lastName": "string",
+  "email": "string",
+  "password": "string",
+  "staff_id": "string",
+  "department_id": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /auth/register/student</strong> — Register new student</summary>
+
+**Request Body:**
+```json
+{
+  "firstName": "string",
+  "lastName": "string",
+  "email": "string",
+  "password": "string",
+  "matric_num": "string",
+  "admission_session": "string (e.g. \"2021/2022\")",
+  "department_id": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /auth/login</strong> — Login user</summary>
+
+**Request Body:**
+```json
+{
+  "email": "string",
+  "password": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "accessToken": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /auth/logout</strong> — Logout current user</summary>
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /auth/forgot-password</strong> — Request password reset</summary>
+
+**Request Body:**
+```json
+{
+  "email": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /auth/reset-password</strong> — Reset password</summary>
+
+**Request Body:**
+```json
+{
+  "token": "string",
+  "newPassword": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /auth/me</strong> — Get current user profile</summary>
+
+**Response (Student):**
+```json
+{
+  "id": "string",
+  "firstName": "string",
+  "lastName": "string",
+  "email": "string",
+  "role": "student",
+  "matric_num": "string",
+  "admission_session": "string",
+  "levelOffset": 0,
+  "department": { "id": "string", "name": "string" }
+}
+```
+
+**Response (Lecturer):**
+```json
+{
+  "id": "string",
+  "firstName": "string",
+  "lastName": "string",
+  "email": "string",
+  "role": "lecturer",
+  "staff_id": "string",
+  "authorized": true,
+  "department": { "id": "string", "name": "string" }
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /auth/me</strong> — Update current user profile</summary>
+
+**Request Body (all optional):**
+```json
+{
+  "firstName": "string",
+  "lastName": "string",
+  "phone": "string",
+  "avatar": "file (multipart)"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "user": { "id": "string", "firstName": "string", "lastName": "string", "email": "string", ... }
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /auth/me/password</strong> — Change password</summary>
+
+**Request Body:**
+```json
+{
+  "currentPassword": "string",
+  "newPassword": "string",
+  "confirmPassword": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /auth/me/student</strong> — Update student-specific fields</summary>
+
+**Request Body (optional):**
+```json
+{
+  "matric_num": "string",
+  "admission_session": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "user": { "id": "string", "matric_num": "string", "admission_session": "string" }
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /auth/me/lecturer</strong> — Update lecturer-specific fields</summary>
+
+**Request Body (optional):**
+```json
+{
+  "staff_id": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "user": { "id": "string", "staff_id": "string" }
+}
+```
+</details>
+
+---
+
+## Student
+<details>
+<summary><strong>GET /courses</strong> — View all available courses</summary>
+
+**Query Parameters (optional):** `department`, `level`, `search`, `page`, `limit`
+
+**Response:**
+```json
+{
+  "courses": [
+    {
+      "id": "string",
+      "title": "string",
+      "code": "string",
+      "level": 0,
+      "department": "string",
+      "lecturer": { "id": "string", "firstName": "string", "lastName": "string" },
+      "totalStudents": 0
+    }
+  ],
+  "pagination": { "page": 0, "limit": 0, "total": 0 }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /courses/:courseId</strong> — View single course details</summary>
+
+**Path Parameters:** `courseId`
+
+**Response:**
+```json
+{
+  "id": "string",
+  "title": "string",
+  "code": "string",
+  "description": "string",
+  "level": 0,
+  "department": "string",
+  "lecturer": { "id": "string", "firstName": "string", "lastName": "string" },
+  "isRegistered": true,
+  "totalStudents": 0
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /courses/:courseId/register</strong> — Register for a course</summary>
+
+**Path Parameters:** `courseId`
+
+**Response:**
+```json
+{
+  "message": "string",
+  "status": "pending | approved"
+}
+```
+</details>
+
+<details>
+<summary><strong>DELETE /courses/:courseId/register</strong> — Drop course registration</summary>
+
+**Path Parameters:** `courseId`
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /student/courses</strong> — View registered courses</summary>
+
+**Query Parameters (optional):** `status` (`pending` | `approved`), `semesterId`
+
+**Response:**
+```json
+{
+  "courses": [
+    {
+      "id": "string",
+      "title": "string",
+      "code": "string",
+      "level": 0,
+      "status": "pending | approved",
+      "lecturer": { "id": "string", "firstName": "string", "lastName": "string" }
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /student/courses/:courseId/materials</strong> — View course materials</summary>
+
+**Path Parameters:** `courseId`  
+**Query (optional):** `type` (`note` | `slide` | `resource`)
+
+**Response:**
+```json
+{
+  "materials": [
+    {
+      "id": "string",
+      "title": "string",
+      "type": "string",
+      "fileUrl": "string",
+      "uploadedAt": "datetime",
+      "visibility": "string"
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /student/courses/:courseId/tasks</strong> — View tasks for a course</summary>
+
+**Path Parameters:** `courseId`  
+**Query (optional):** `status` (`upcoming` | `ungraded` | `ai_draft` | `ai_approved` | `manually_graded` | `overdue`)
+
+**Response:**
+```json
+{
+  "tasks": [
+    {
+      "id": "string",
+      "title": "string",
+      "dueDate": "datetime",
+      "maxScore": 0,
+      "submissionStatus": "string",
+      "score": 0
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /student/courses/:courseId/tasks/:taskId</strong> — View specific task</summary>
+
+**Path Parameters:** `courseId`, `taskId`
+
+**Response:**
+```json
+{
+  "id": "string",
+  "title": "string",
+  "description": "string",
+  "dueDate": "datetime",
+  "totalScore": 0,
+  "questions": [
+    {
+      "id": "string",
+      "text": "string",
+      "type": "string",
+      "score": 0,
+      "options": ["string"]
+    }
+  ],
+  "submission": { "submittedAt": "datetime", "answers": [] } | null
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /student/courses/:courseId/tasks/:taskId/submit</strong> — Submit task</summary>
+
+**Path Parameters:** `courseId`, `taskId`  
+**Body (multipart):** `answers[]` (with appropriate fields based on question type)
+
+**Response:**
+```json
+{
+  "message": "string",
+  "submission": { "id": "string", "submittedAt": "datetime", "answersCount": 0 }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /student/courses/:courseId/grades</strong> — View grades for a course</summary>
+
+**Path Parameters:** `courseId`
+
+**Response:**
+```json
+{
+  "grades": [
+    {
+      "taskId": "string",
+      "taskTitle": "string",
+      "score": 0,
+      "maxScore": 0,
+      "gradedAt": "datetime",
+      "feedback": "string"
+    }
+  ],
+  "summary": {
+    "totalScore": 0,
+    "average": 0,
+    "grade": "string"
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /student/courses/:courseId/announcements</strong> — View course announcements</summary>
+
+**Path Parameters:** `courseId`  
+**Query (optional):** `viewed`, `pinned`, `page`, `limit`
+
+**Response:**
+```json
+{
+  "announcements": [
+    {
+      "id": "string",
+      "title": "string",
+      "body": "string",
+      "createdAt": "datetime",
+      "lecturer": { "id": "string", "firstName": "string", "lastName": "string" },
+      "viewed": true
+    }
+  ],
+  "pagination": { "page": 0, "limit": 0, "total": 0 }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /student/courses/:courseId/attendance</strong> — View personal attendance</summary>
+
+**Path Parameters:** `courseId`
+
+**Response:**
+```json
+{
+  "attendance": [
+    {
+      "sessionId": "string",
+      "sessionDate": "datetime",
+      "status": "present | absent"
+    }
+  ],
+  "summary": {
+    "total": 0,
+    "present": 0,
+    "absent": 0,
+    "percentage": 0
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /student/courses/:courseId/sessions</strong> — View course sessions</summary>
+
+**Path Parameters:** `courseId`  
+**Query (optional):** `status` (`upcoming` | `completed` | `cancelled`)
+
+**Response:**
+```json
+{
+  "sessions": [
+    {
+      "id": "string",
+      "title": "string",
+      "scheduledAt": "datetime",
+      "venue": "string",
+      "status": "string",
+      "attended": true | null,
+      "lecturer": { "id": "string", "firstName": "string", "lastName": "string" }
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /student/courses/:courseId/sessions/:sessionId</strong> — View specific session</summary>
+
+**Path Parameters:** `courseId`, `sessionId`
+</details>
+
+<details>
+<summary><strong>GET /student/analytics</strong> — View overall analytics (planned)</summary>
+</details>
+
+<details>
+<summary><strong>GET /student/courses/:courseId/analytics</strong> — View course analytics (planned)</summary>
+</details>
+
+<details>
+<summary><strong>POST /student/courses/:courseId/ai-tutor</strong> — Chat with AI tutor (planned)</summary>
+
+**Path Parameters:** `courseId`
+
+**Request Body:**
+```json
+{
+  "message": "string",
+  "history": [{ "role": "user | assistant", "content": "string" }]
+}
+```
+
+**Response:**
+```json
+{
+  "reply": "string"
+}
+```
+</details>
+
+
+---
+
+## Lecturer
+<details>
+<summary><strong>GET /lecturer/courses</strong> — View all courses assigned to the lecturer</summary>
+
+**Response:**
+```json
+{
+  "courses": [
+    {
+      "id": "string",
+      "title": "string",
+      "code": "string",
+      "level": 0,
+      "totalStudents": 0,
+      "isActive": true,
+      "lecturers": [{ "id": "string", "name": "string" }]
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /lecturer/courses/:courseId</strong> — View details of an assigned course</summary>
+
+**Path Parameters:** `courseId`
+
+**Response:**
+```json
+{
+  "id": "string",
+  "title": "string",
+  "code": "string",
+  "level": 0,
+  "lecturers": [{ "id": "string", "name": "string" }],
+  "description": "string",
+  "department": "string",
+  "totalStudents": 0,
+  "sessions": 0,
+  "tasksCount": 0
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /lecturer/courses/:courseId/students</strong> — View all students in a course</summary>
+
+**Path Parameters:** `courseId`  
+**Query Parameters (optional):** `status` (enum: `pending` | `approved`)
+
+**Response:**
+```json
+{
+  "students": [
+    {
+      "id": "string",
+      "firstName": "string",
+      "lastName": "string",
+      "email": "string",
+      "registrationStatus": "pending | approved"
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /lecturer/courses/:courseId/students/:studentId/approve</strong> — Approve or reject student registration</summary>
+
+**Path Parameters:** `courseId`, `studentId`
+
+**Request Body:**
+```json
+{
+  "status": "approved | rejected"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /lecturer/courses/:courseId/materials</strong> — Upload course material</summary>
+
+**Path Parameters:** `courseId`  
+**Body (multipart/form-data):**
+- `title`: string
+- `type`: enum (`note` | `slide` | `resource`)
+- `file`: file
+- `visibility`: enum (`students_only` | `ai_only` | `both`)
+
+**Response:**
+```json
+{
+  "message": "string",
+  "material": {
+    "id": "string",
+    "title": "string",
+    "type": "string",
+    "fileUrl": "string",
+    "visibility": "string",
+    "uploadedAt": "datetime"
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /lecturer/courses/:courseId/materials/:materialId</strong> — Update material metadata</summary>
+
+**Path Parameters:** `courseId`, `materialId`
+
+**Request Body (all optional):**
+```json
+{
+  "title": "string",
+  "visibility": "students_only | ai_only | both"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "material": { "id": "string", "title": "string", "visibility": "string" }
+}
+```
+</details>
+
+<details>
+<summary><strong>DELETE /lecturer/courses/:courseId/materials/:materialId</strong> — Delete course material</summary>
+
+**Path Parameters:** `courseId`, `materialId`
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /lecturer/courses/:courseId/materials/:materialId/index</strong> — Trigger AI indexing for material</summary>
+
+**Path Parameters:** `courseId`, `materialId`
+
+**Response:**
+```json
+{
+  "message": "string",
+  "material": {
+    "id": "string",
+    "indexed": true,
+    "indexedAt": "datetime"
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /lecturer/courses/:courseId/tasks</strong> — Create a new task</summary>
+
+**Path Parameters:** `courseId`
+
+**Request Body:**
+```json
+{
+  "title": "string",
+  "description": "string (optional)",
+  "dueDate": "datetime",
+  "sessionId": "string (optional)",
+  "questions": [
+    {
+      "text": "string",
+      "type": "mcq | free_text | document_upload",
+      "score": 0,
+      "options": ["string"]   // required only for mcq
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "task": {
+    "id": "string",
+    "title": "string",
+    "dueDate": "datetime",
+    "questionCount": 0
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /lecturer/courses/:courseId/tasks</strong> — View all tasks for a course</summary>
+
+**Path Parameters:** `courseId`
+
+**Response:**
+```json
+{
+  "tasks": [
+    {
+      "id": "string",
+      "title": "string",
+      "dueDate": "datetime",
+      "questionCount": 0,
+      "totalScore": 0,
+      "aiGrading": true
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /lecturer/courses/:courseId/tasks/:taskId</strong> — View full task details</summary>
+
+**Path Parameters:** `courseId`, `taskId`
+
+**Response:**
+```json
+{
+  "id": "string",
+  "title": "string",
+  "description": "string",
+  "dueDate": "datetime",
+  "totalScore": 0,
+  "aiGrading": true,
+  "markingGuideUrl": "string | null",
+  "questions": [
+    {
+      "id": "string",
+      "text": "string",
+      "type": "string",
+      "score": 0,
+      "options": ["string"]   // only for mcq
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /lecturer/courses/:courseId/tasks/:taskId</strong> — Update task</summary>
+
+**Path Parameters:** `courseId`, `taskId`
+
+**Request Body (all optional):**
+```json
+{
+  "title": "string",
+  "description": "string",
+  "dueDate": "datetime",
+  "sessionId": "string | null"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "task": { "id": "string", "title": "string", "dueDate": "datetime" }
+}
+```
+</details>
+
+<details>
+<summary><strong>DELETE /lecturer/courses/:courseId/tasks/:taskId</strong> — Delete task</summary>
+
+**Path Parameters:** `courseId`, `taskId`
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /lecturer/courses/:courseId/tasks/:taskId/questions</strong> — Add question to task</summary>
+
+**Path Parameters:** `courseId`, `taskId`
+
+**Request Body:**
+```json
+{
+  "text": "string",
+  "type": "mcq | free_text | document_upload",
+  "score": 0,
+  "options": ["string"]   // required only for mcq
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "question": { "id": "string", "text": "string", "type": "string", "score": 0 }
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /lecturer/courses/:courseId/tasks/:taskId/questions/:questionId</strong> — Update question</summary>
+
+**Path Parameters:** `courseId`, `taskId`, `questionId`
+
+**Request Body (all optional):**
+```json
+{
+  "text": "string",
+  "score": 0,
+  "options": ["string"]
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "question": { "id": "string", "text": "string", "score": 0 }
+}
+```
+</details>
+
+<details>
+<summary><strong>DELETE /lecturer/courses/:courseId/tasks/:taskId/questions/:questionId</strong> — Delete question</summary>
+
+**Path Parameters:** `courseId`, `taskId`, `questionId`
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /lecturer/courses/:courseId/tasks/:taskId/marking-guide</strong> — Upload marking guide</summary>
+
+**Path Parameters:** `courseId`, `taskId`  
+**Body (multipart):** `markingGuide` (file)
+
+**Response:**
+```json
+{
+  "message": "string",
+  "markingGuideUrl": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /lecturer/courses/:courseId/tasks/:taskId/ai-grading</strong> — Enable/Disable AI grading</summary>
+
+**Path Parameters:** `courseId`, `taskId`
+
+**Request Body:**
+```json
+{
+  "enabled": true
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "aiGrading": true
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /lecturer/courses/:courseId/tasks/:taskId/submissions</strong> — View submissions for a task</summary>
+
+**Path Parameters:** `courseId`, `taskId`  
+**Query (optional):** `graded` (boolean)
+
+**Response:**
+```json
+{
+  "submissions": [
+    {
+      "id": "string",
+      "student": { "id": "string", "name": "string" },
+      "submittedAt": "datetime",
+      "totalScore": 0,
+      "gradingStatus": "ungraded | ai_draft | ai_approved | manually_graded"
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /lecturer/courses/:courseId/tasks/:taskId/submissions/:submissionId</strong> — View specific submission</summary>
+
+**Path Parameters:** `courseId`, `taskId`, `submissionId`
+
+**Response:**
+```json
+{
+  "student": { "id": "string", "name": "string", "matric_num": "string" },
+  "submittedAt": "datetime",
+  "totalScore": 0,
+  "gradingStatus": "ungraded | ai_draft | ai_approved | manually_graded",
+  "answers": [
+    {
+      "questionId": "string",
+      "questionText": "string",
+      "type": "string",
+      "score": 0,
+      "maxScore": 0,
+      // fields vary by type (selectedOption, text, fileUrl, feedback, etc.)
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /lecturer/courses/:courseId/tasks/:taskId/submissions/:submissionId/grade</strong> — Grade a submission</summary>
+
+**Path Parameters:** `courseId`, `taskId`, `submissionId`
+
+**Request Body:**
+```json
+{
+  "grades": [
+    {
+      "questionId": "string",
+      "score": 0,
+      "feedback": "string (optional)"
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "submission": { "id": "string", "totalScore": 0, "gradedAt": "datetime" }
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /lecturer/courses/:courseId/tasks/:taskId/submissions/approve-ai-grades</strong> — Approve AI draft grades</summary>
+
+**Path Parameters:** `courseId`, `taskId`
+
+**Request Body (optional):**
+```json
+{
+  "submissionIds": ["string"]
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "approved": 0
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /lecturer/courses/:courseId/sessions</strong> — Schedule a new class session</summary>
+
+**Path Parameters:** `courseId`
+
+**Request Body:**
+```json
+{
+  "title": "string",
+  "scheduledAt": "datetime",
+  "venue": "string (optional)",
+  "notes": "string (optional)"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "session": {
+    "id": "string",
+    "title": "string",
+    "scheduledAt": "datetime",
+    "venue": "string",
+    "status": "string"
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /lecturer/courses/:courseId/sessions</strong> — View all sessions for a course</summary>
+
+**Path Parameters:** `courseId`  
+**Query (optional):** `status` (`upcoming` | `completed` | `cancelled`)
+
+**Response:**
+```json
+{
+  "sessions": [
+    {
+      "id": "string",
+      "title": "string",
+      "scheduledAt": "datetime",
+      "venue": "string",
+      "status": "string",
+      "attendanceCount": 0
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /lecturer/courses/:courseId/sessions/:sessionId</strong> — View session details with attendance</summary>
+
+**Path Parameters:** `courseId`, `sessionId`
+
+**Response:**
+```json
+{
+  "session": { "id": "string", "title": "string", "scheduledAt": "datetime", "venue": "string", "status": "string" },
+  "lecturer": { "id": "string", "firstName": "string", "lastName": "string" },
+  "isOwner": true,
+  "attendance": [
+    { "studentId": "string", "name": "string", "status": "present | absent" }
+  ],
+  "tasks": [
+    { "taskId": "string", "title": "string", "submissionsCount": 0 }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /lecturer/courses/:courseId/sessions/:sessionId/attendance</strong> — Mark attendance</summary>
+
+**Path Parameters:** `courseId`, `sessionId`
+
+**Request Body:**
+```json
+{
+  "records": [
+    { "studentId": "string", "status": "present | absent" }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "marked": 0
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /lecturer/courses/:courseId/gradebook</strong> — View course gradebook</summary>
+
+**Path Parameters:** `courseId`
+
+**Response:**
+```json
+{
+  "students": [
+    {
+      "studentId": "string",
+      "name": "string",
+      "tasks": [{ "taskId": "string", "title": "string", "score": 0, "maxScore": 0 }],
+      "totalScore": 0,
+      "average": 0,
+      "grade": "string"
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /lecturer/courses/:courseId/gradebook/:studentId</strong> — Manually update student grade</summary>
+
+**Path Parameters:** `courseId`, `studentId`
+
+**Request Body (optional):**
+```json
+{
+  "notes": "string",
+  "manualGrade": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /lecturer/courses/:courseId/announcements</strong> — Post announcement</summary>
+
+**Path Parameters:** `courseId`
+
+**Request Body:**
+```json
+{
+  "title": "string",
+  "body": "string",
+  "pinned": true
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "announcement": {
+    "id": "string",
+    "title": "string",
+    "body": "string",
+    "createdAt": "datetime"
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /lecturer/courses/:courseId/announcements</strong> — View announcements</summary>
+
+**Path Parameters:** `courseId`  
+**Query (optional):** `pinned`, `page`, `limit`
+
+**Response:**
+```json
+{
+  "announcements": [
+    {
+      "id": "string",
+      "title": "string",
+      "body": "string",
+      "pinned": true,
+      "createdAt": "datetime"
+    }
+  ],
+  "pagination": { "page": 0, "limit": 0, "total": 0 }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /lecturer/courses/:courseId/announcements/:announcementId</strong> — View specific announcement</summary>
+
+**Path Parameters:** `courseId`, `announcementId`
+</details>
+
+<details>
+<summary><strong>PATCH /lecturer/courses/:courseId/announcements/:announcementId</strong> — Update announcement</summary>
+
+**Path Parameters:** `courseId`, `announcementId`
+</details>
+
+<details>
+<summary><strong>DELETE /lecturer/courses/:courseId/announcements/:announcementId</strong> — Delete announcement</summary>
+
+**Path Parameters:** `courseId`, `announcementId`
+</details>
+
+<details>
+<summary><strong>GET /lecturer/courses/:courseId/analytics</strong> — View course analytics (planned)</summary>
+
+**Path Parameters:** `courseId`
+</details>
+
+<details>
+<summary><strong>GET /lecturer/analytics</strong> — View overall lecturer analytics (planned)</summary>
+</details>
+
+<details>
+<summary><strong>PATCH /lecturer/courses/:courseId/ai-tutor/rules</strong> — Set or update AI tutor instructions for a course</summary>
+
+**Path Parameters:** `courseId`
+
+**Request Body:**
+```json
+{
+  "rules": "string (freeform instructions for the AI)"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "rules": "string"
+}
+```
+</details>
+---
+
+## HOD
+
+<details>
+<summary><strong>GET /hod/students</strong> — View all students in the department</summary>
+
+**Query Parameters (optional):** `search`, `page`, `limit`
+
+**Response:**
+```json
+{
+  "users": [
+    { "id": "string", "firstName": "string", "lastName": "string", "email": "string", "role": "student" }
+  ],
+  "pagination": { "page": 0, "limit": 0, "total": 0 }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /hod/lecturers</strong> — View all lecturers in the department</summary>
+
+**Query Parameters (optional):** `search`, `page`, `limit`
+
+**Response:** Same structure as `/hod/students`
+</details>
+
+<details>
+<summary><strong>GET /hod/students/:studentId</strong> — View specific student details</summary>
+
+**Path Parameters:** `studentId`
+
+**Response:**
+```json
+{
+  "id": "string",
+  "firstName": "string",
+  "lastName": "string",
+  "email": "string",
+  "role": "student",
+  "matric_num": "string",
+  "admission_session": "string",
+  "levelOffset": 0,
+  "department": { "id": "string", "name": "string" },
+  "offerings": [
+    {
+      "id": "string",
+      "courseTitle": "string",
+      "academicSession": "string",
+      "semester": "string",
+      "status": "string"
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /hod/lecturers/:lecturerId</strong> — View specific lecturer details</summary>
+
+**Path Parameters:** `lecturerId`
+
+**Response:**
+```json
+{
+  "id": "string",
+  "firstName": "string",
+  "lastName": "string",
+  "email": "string",
+  "role": "lecturer",
+  "staff_id": "string",
+  "authorized": true,
+  "department": { "id": "string", "name": "string" },
+  "offerings": [
+    {
+      "id": "string",
+      "courseTitle": "string",
+      "academicSession": "string",
+      "semester": "string",
+      "isActive": true
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /hod/students/:studentId/level-offset</strong> — Update student's level offset</summary>
+
+**Path Parameters:** `studentId`
+
+**Request Body:**
+```json
+{
+  "levelOffset": 0
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "student": {
+    "id": "string",
+    "levelOffset": 0,
+    "level": 0
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /hod/courses</strong> — Create a new course definition</summary>
+
+**Request Body:**
+```json
+{
+  "title": "string",
+  "code": "string (e.g. CSC101)",
+  "description": "string (optional)",
+  "units": 0
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "course": {
+    "id": "string",
+    "title": "string",
+    "code": "string",
+    "units": 0,
+    "department": { "id": "string", "name": "string" }
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /hod/courses</strong> — View all course definitions in the department</summary>
+
+**Query Parameters (optional):** `search`, `page`, `limit`
+
+**Response:**
+```json
+{
+  "courses": [
+    {
+      "id": "string",
+      "title": "string",
+      "code": "string",
+      "units": 0,
+      "totalOfferings": 0,
+      "activeOffering": true
+    }
+  ],
+  "pagination": { "page": 0, "limit": 0, "total": 0 }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /hod/courses/:courseId</strong> — View course definition details</summary>
+
+**Path Parameters:** `courseId`
+
+**Response:**
+```json
+{
+  "id": "string",
+  "title": "string",
+  "code": "string",
+  "description": "string",
+  "units": 0,
+  "department": { "id": "string", "name": "string" },
+  "offerings": [
+    {
+      "id": "string",
+      "academicSession": "string",
+      "semester": "string",
+      "isActive": true,
+      "lecturer": { "id": "string", "name": "string" }
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /hod/courses/:courseId</strong> — Update course definition</summary>
+
+**Path Parameters:** `courseId`
+
+**Request Body (all optional):**
+```json
+{
+  "title": "string",
+  "description": "string",
+  "units": 0
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "course": {
+    "id": "string",
+    "title": "string",
+    "code": "string",
+    "units": 0
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>DELETE /hod/courses/:courseId</strong> — Delete course definition</summary>
+
+**Path Parameters:** `courseId`
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /hod/courses/:courseId/offerings</strong> — Create course offering</summary>
+
+**Path Parameters:** `courseId`
+
+**Request Body:**
+```json
+{
+  "semesterId": "string",
+  "lecturerId": "string (optional)"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "offering": {
+    "id": "string",
+    "courseId": "string",
+    "academicSession": "string",
+    "semester": "string",
+    "isActive": true,
+    "lecturer": { "id": "string", "firstName": "string", "lastName": "string" }
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /hod/courses/:courseId/offerings</strong> — View all offerings for a course</summary>
+
+**Path Parameters:** `courseId`  
+**Query Parameters (optional):** `semesterId`, `isActive`
+
+**Response:**
+```json
+{
+  "offerings": [
+    {
+      "id": "string",
+      "academicSession": "string",
+      "semester": "string",
+      "isActive": true,
+      "totalStudents": 0,
+      "lecturer": { "id": "string", "firstName": "string", "lastName": "string" }
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /hod/courses/:courseId/offerings/:offeringId</strong> — View specific offering details</summary>
+
+**Path Parameters:** `courseId`, `offeringId`
+
+**Response:**
+```json
+{
+  "id": "string",
+  "course": { "id": "string", "title": "string", "code": "string" },
+  "academicSession": "string",
+  "semester": "string",
+  "isActive": true,
+  "lecturer": { "id": "string", "firstName": "string", "lastName": "string", "staff_id": "string" },
+  "totalStudents": 0,
+  "totalSessions": 0,
+  "totalTasks": 0
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /hod/courses/:courseId/offerings/:offeringId/activate</strong> — Activate/Deactivate offering</summary>
+
+**Path Parameters:** `courseId`, `offeringId`
+
+**Request Body:**
+```json
+{
+  "isActive": true
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "offering": { "id": "string", "isActive": true }
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /hod/courses/:courseId/offerings/:offeringId/assign</strong> — Assign lecturer to offering</summary>
+
+**Path Parameters:** `courseId`, `offeringId`
+
+**Request Body:**
+```json
+{
+  "lecturerId": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "offering": {
+    "id": "string",
+    "lecturer": { "id": "string", "firstName": "string", "lastName": "string" }
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>DELETE /hod/courses/:courseId/offerings/:offeringId/assign/:lecturerId</strong> — Unassign lecturer from offering</summary>
+
+**Path Parameters:** `courseId`, `offeringId`, `lecturerId`
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+---
+
+
+## Admin
+
+<details>
+<summary><strong>POST /admin/staff/authorize</strong> — Bulk authorize lecturer accounts</summary>
+
+**Request Body:**
+```json
+{
+  "userIds": ["string"]
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "authorized": 0,
+  "failed": [
+    { "userId": "string", "reason": "string" }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /admin/faculties</strong> — Create a new faculty</summary>
+
+**Request Body:**
+```json
+{
+  "name": "string (e.g. \"Faculty of Science\")",
+  "code": "string (e.g. \"FOS\")"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "faculty": {
+    "id": "string",
+    "name": "string",
+    "code": "string"
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /admin/faculties</strong> — View all faculties</summary>
+
+**Response:**
+```json
+{
+  "faculties": [
+    {
+      "id": "string",
+      "name": "string",
+      "code": "string",
+      "totalDepartments": 0
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /admin/faculties/:facultyId</strong> — Update a faculty</summary>
+
+**Path Parameters:** `facultyId`
+
+**Request Body (all optional):**
+```json
+{
+  "name": "string",
+  "code": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "faculty": {
+    "id": "string",
+    "name": "string",
+    "code": "string"
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>DELETE /admin/faculties/:facultyId</strong> — Delete a faculty</summary>
+
+**Path Parameters:** `facultyId`
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /admin/faculties/:facultyId/departments</strong> — Create a department</summary>
+
+**Path Parameters:** `facultyId`
+
+**Request Body:**
+```json
+{
+  "name": "string (e.g. \"Computer Science\")",
+  "code": "string (e.g. \"CSC\")"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "department": {
+    "id": "string",
+    "name": "string",
+    "code": "string",
+    "faculty": { "id": "string", "name": "string" }
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /admin/faculties/:facultyId/departments</strong> — View all departments in a faculty</summary>
+
+**Path Parameters:** `facultyId`
+
+**Response:**
+```json
+{
+  "departments": [
+    {
+      "id": "string",
+      "name": "string",
+      "code": "string",
+      "hod": { "id": "string", "name": "string" } | null,
+      "totalCourses": 0
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /admin/faculties/:facultyId/departments/:departmentId</strong> — View specific department details</summary>
+
+**Path Parameters:** `facultyId`, `departmentId`
+
+**Response:**
+```json
+{
+  "id": "string",
+  "name": "string",
+  "code": "string",
+  "faculty": { "id": "string", "name": "string" },
+  "hod": { "id": "string", "firstName": "string", "lastName": "string" } | null,
+  "totalCourses": 0,
+  "totalStudents": 0,
+  "totalLecturers": 0
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /admin/faculties/:facultyId/departments/:departmentId</strong> — Update a department</summary>
+
+**Path Parameters:** `facultyId`, `departmentId`
+
+**Request Body (all optional):**
+```json
+{
+  "name": "string",
+  "code": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "department": {
+    "id": "string",
+    "name": "string",
+    "code": "string"
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>DELETE /admin/faculties/:facultyId/departments/:departmentId</strong> — Delete a department</summary>
+
+**Path Parameters:** `facultyId`, `departmentId`
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /admin/departments/:departmentId/hod</strong> — Assign HOD to department</summary>
+
+**Path Parameters:** `departmentId`
+
+**Request Body:**
+```json
+{
+  "userId": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /admin/departments/:departmentId/hod</strong> — Replace current HOD</summary>
+
+**Path Parameters:** `departmentId`
+
+**Request Body:**
+```json
+{
+  "userId": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /admin/users</strong> — View all users across the system</summary>
+
+**Query Parameters (optional):**  
+`role` (enum: `student` | `lecturer` | `hod` | `admin`), `department`, `search`, `page`, `limit`
+
+**Response:**
+```json
+{
+  "users": [
+    {
+      "id": "string",
+      "firstName": "string",
+      "lastName": "string",
+      "email": "string",
+      "role": "string",
+      "department": "string"
+    }
+  ],
+  "pagination": {
+    "page": 0,
+    "limit": 0,
+    "total": 0
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /admin/academic-sessions</strong> — Create academic session with semesters</summary>
+
+**Request Body:**
+```json
+{
+  "name": "string (e.g. \"2024/2025\")",
+  "semesters": [
+    {
+      "name": "first | second",
+      "startDate": "datetime",
+      "endDate": "datetime"
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "session": {
+    "id": "string",
+    "name": "string",
+    "semesters": [
+      {
+        "id": "string",
+        "name": "string",
+        "startDate": "datetime",
+        "endDate": "datetime",
+        "isActive": false
+      }
+    ]
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /admin/academic-sessions</strong> — Get all academic sessions</summary>
+
+**Response:**
+```json
+{
+  "sessions": [
+    {
+      "id": "string",
+      "name": "string",
+      "createdAt": "datetime",
+      "semesters": [
+        {
+          "id": "string",
+          "name": "string",
+          "startDate": "datetime",
+          "endDate": "datetime",
+          "isActive": true
+        }
+      ]
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /admin/academic-sessions/:sessionId</strong> — Get single academic session</summary>
+
+**Path Parameters:** `sessionId`
+
+**Response:**
+```json
+{
+  "id": "string",
+  "name": "string",
+  "createdAt": "datetime",
+  "semesters": [
+    {
+      "id": "string",
+      "name": "string",
+      "startDate": "datetime",
+      "endDate": "datetime",
+      "isActive": true
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /admin/academic-sessions/:sessionId</strong> — Update academic session</summary>
+
+**Path Parameters:** `sessionId`
+
+**Request Body (optional):**
+```json
+{
+  "name": "string (e.g. \"2024/2025\")"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "session": {
+    "id": "string",
+    "name": "string"
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>DELETE /admin/academic-sessions/:sessionId</strong> — Delete academic session</summary>
+
+**Path Parameters:** `sessionId`
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /admin/academic-sessions/:sessionId/semesters/:semesterId/activate</strong> — Activate a semester</summary>
+
+**Path Parameters:** `sessionId`, `semesterId`
+
+**Response:**
+```json
+{
+  "message": "string",
+  "semester": {
+    "id": "string",
+    "name": "string",
+    "isActive": true
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /admin/academic-sessions/:sessionId/semesters/:semesterId</strong> — Update a semester</summary>
+
+**Path Parameters:** `sessionId`, `semesterId`
+
+**Request Body (all optional):**
+```json
+{
+  "startDate": "datetime",
+  "endDate": "datetime"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string",
+  "semester": {
+    "id": "string",
+    "startDate": "datetime",
+    "endDate": "datetime"
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>DELETE /admin/academic-sessions/:sessionId/semesters/:semesterId</strong> — Delete a semester</summary>
+
+**Path Parameters:** `sessionId`, `semesterId`
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+---
+
+## Shared
+
+<details>
+<summary><strong>GET /materials/:materialId/download</strong> — Download material file</summary>
+
+**Path Parameters:** `materialId`  
+**Response:** Binary file stream or redirect to file URL
+</details>
+
+<details>
+<summary><strong>GET /notifications</strong> — Get notifications for current user</summary>
+
+**Query Parameters (optional):** `read` (boolean), `page`, `limit`
+
+**Response:**
+```json
+{
+  "notifications": [
+    {
+      "id": "string",
+      "message": "string",
+      "type": "string",
+      "read": false,
+      "createdAt": "datetime",
+      "link": "string"
+    }
+  ],
+  "unreadCount": 0
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /notifications/:notificationId/read</strong> — Mark notification as read</summary>
+
+**Path Parameters:** `notificationId`
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+</file>
+
+<file path="src/app/api/v1/__init__.py">
+# src/app/api/v1/__init__.py
+</file>
+
+<file path="src/app/api/v1/admin.py">
+# src/app/api/v1/admin.py
+"""
+Admin endpoints — all protected routes for the admin role.
+
+All routes in this module currently return 501 Not Implemented.
+They will be fleshed out in Phase 3 (Admin endpoints).
+"""
+⋮----
+router = APIRouter(
+⋮----
+_NOT_IMPLEMENTED = JSONResponse(
+⋮----
+# ---------------------------------------------------------------------------
+# Faculties
+⋮----
+@router.post("/faculties", response_model=FacultyResponse, status_code=status.HTTP_201_CREATED)
+async def create_faculty(payload: FacultyCreate, session: DBSession) -> FacultyResponse
+⋮----
+svc = AdminService(session)
+fac = await svc.create_faculty(payload)
+⋮----
+@router.get("/faculties", response_model=list[FacultyResponse])
+async def list_faculties(session: DBSession) -> list[FacultyResponse]
+⋮----
+facs = await svc.list_faculties()
+⋮----
+fac = await svc.update_faculty(faculty_id, payload)
+⋮----
+@router.delete("/faculties/{faculty_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_faculty(faculty_id: uuid.UUID, session: DBSession) -> None
+⋮----
+# Departments
+⋮----
+dept = await svc.create_department(faculty_id, payload)
+⋮----
+@router.get("/faculties/{faculty_id}/departments", response_model=list[DepartmentResponse])
+async def list_departments(faculty_id: uuid.UUID, session: DBSession) -> list[DepartmentResponse]
+⋮----
+depts = await svc.list_departments_by_faculty(faculty_id)
+⋮----
+dept = await svc.get_department(faculty_id, department_id)
+⋮----
+dept = await svc.update_department(faculty_id, department_id, payload)
+⋮----
+dept = await svc.assign_hod(department_id, payload.hod_id)
+⋮----
+# Logic for assigning/replacing is exactly the same, it overrides hod_id.
+⋮----
+# Academic Calendar
+⋮----
+sess = await svc.create_session(payload)
+⋮----
+@router.get("/academic-sessions", response_model=list[AcademicSessionResponse])
+async def list_sessions(session: DBSession) -> list[AcademicSessionResponse]
+⋮----
+sessions = await svc.list_sessions()
+⋮----
+@router.get("/academic-sessions/{session_id}", response_model=AcademicSessionResponse)
+async def get_session(session_id: uuid.UUID, session: DBSession) -> AcademicSessionResponse
+⋮----
+sess = await svc.get_session(session_id)
+⋮----
+sess = await svc.update_session(session_id, payload)
+⋮----
+@router.delete("/academic-sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_session(session_id: uuid.UUID, session: DBSession) -> None
+⋮----
+sem = await svc.activate_semester(session_id, semester_id)
+⋮----
+sem = await svc.update_semester(session_id, semester_id, payload)
+⋮----
+# Users
+⋮----
+svc = UserService(session)
+</file>
+
+<file path="src/app/api/v1/auth.py">
+# src/app/api/v1/auth.py
+"""
+Auth endpoints — AMS version.
+
+Unauthenticated (except /logout, /me, /me/*):
+  POST /auth/register/student
+  POST /auth/register/lecturer
+  POST /auth/login
+  POST /auth/refresh
+  POST /auth/forgot-password
+  POST /auth/reset-password
+
+Authenticated (Bearer JWT):
+  POST   /auth/logout
+  GET    /auth/me
+  PATCH  /auth/me
+  PATCH  /auth/me/student
+  PATCH  /auth/me/lecturer
+  PATCH  /auth/me/password
+"""
+⋮----
+router = APIRouter(prefix="/auth", tags=["auth"])
+⋮----
+# ---------------------------------------------------------------------------
+# Registration
+⋮----
+async def register_student(payload: StudentRegister, session: DBSession) -> TokenPair
+⋮----
+"""Create a new student account and return a token pair."""
+⋮----
+async def register_lecturer(payload: LecturerRegister, session: DBSession) -> TokenPair
+⋮----
+"""Create a new lecturer account.
+
+    The account is created with is_authorized=False.
+    The lecturer cannot access protected routes until an Admin authorizes them.
+    """
+⋮----
+# Login / Tokens
+⋮----
+async def login(payload: LoginRequest, session: DBSession) -> TokenPair
+⋮----
+"""Validate credentials and return an access + refresh token pair."""
+⋮----
+async def refresh_token(payload: RefreshRequest, session: DBSession) -> AccessTokenResponse
+⋮----
+"""Exchange a valid refresh token for a new access token."""
+⋮----
+"""Revoke the refresh token. The short-lived access token expires on its own."""
+⋮----
+# Password recovery
+⋮----
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+async def forgot_password(payload: ForgotPasswordRequest, session: DBSession) -> JSONResponse
+⋮----
+"""Request a password reset link (returns 200 even if email not found)."""
+svc = AuthService(session)
+⋮----
+@router.post("/reset-password", status_code=status.HTTP_200_OK)
+async def reset_password(payload: ResetPasswordRequest, session: DBSession) -> JSONResponse
+⋮----
+"""Reset password using a token."""
+⋮----
+# Authenticated user profile
+⋮----
+async def get_me(current_user: CurrentUser) -> UserPublic
+⋮----
+"""Return the profile of the currently authenticated user."""
+⋮----
+"""Partially update first_name, last_name, phone, or avatar."""
+svc = UserService(session)
+updated = await svc.update_profile(current_user.id, payload)
+⋮----
+"""Student-specific profile patch (admission_year)."""
+⋮----
+updated = await svc.update_student_profile(current_user.id, payload)
+⋮----
+"""Partially update lecturer-specific fields (staff_id)."""
+⋮----
+updated = await svc.update_lecturer_profile(current_user.id, payload)
+⋮----
+"""Verify current_password then set new_password."""
+</file>
+
+<file path="src/app/api/v1/health.py">
+# src/app/api/v1/health.py
+"""
+Health check endpoints — no authentication required.
+
+Liveness  GET /healthz  → 200 {"status": "ok"}
+Readiness GET /readyz   → 200 if DB + Redis reachable, 503 otherwise.
+
+Used by Kubernetes / Docker healthchecks and load balancers.
+"""
+⋮----
+router = APIRouter(tags=["health"])
+⋮----
+async def liveness() -> dict[str, str]
+⋮----
+"""Always returns 200. Signals the process is running."""
+⋮----
+async def readiness() -> JSONResponse
+⋮----
+"""Return 200 only when the DB and Redis are reachable.
+
+    The Redis check is performed via the module-level pool imported from
+    ``core.redis`` (written in Layer 6). If redis is unreachable it is
+    reported in the response but does NOT raise an exception during startup
+    — the pod will simply never become Ready.
+    """
+failures: dict[str, str] = {}
+⋮----
+# ------------------------------------------------------------------
+# Database check
+⋮----
+# Redis check (deferred import so Layer 5 compiles before redis.py exists)
+</file>
+
+<file path="src/app/api/v1/hod.py">
+# src/app/api/v1/hod.py
+"""
+HOD endpoints — all protected routes for the HOD role.
+
+All routes in this module currently return 501 Not Implemented.
+They will be fleshed out in Phase 4 (HOD endpoints).
+"""
+⋮----
+router = APIRouter(
+⋮----
+_NOT_IMPLEMENTED = JSONResponse(
+⋮----
+# ---------------------------------------------------------------------------
+# Students
+⋮----
+svc = UserService(session)
+⋮----
+student = await svc.get_user_or_404(student_id)
+⋮----
+# Lecturers
+⋮----
+lecturer = await svc.get_user_or_404(lecturer_id)
+⋮----
+# Course Definitions
+⋮----
+svc = CourseService(session)
+course = await svc.create_course(hod=current_user, payload=payload)
+⋮----
+@router.get("/courses", response_model=list[CourseResponse], status_code=status.HTTP_200_OK)
+async def list_courses(session: DBSession, current_user: CurrentUser) -> list[CourseResponse]
+⋮----
+courses = await svc.list_department_courses(hod=current_user)
+⋮----
+@router.get("/courses/{course_id}", response_model=CourseResponse, status_code=status.HTTP_200_OK)
+async def get_course(course_id: uuid.UUID, session: DBSession, current_user: CurrentUser) -> CourseResponse
+⋮----
+course = await svc.get_department_course(hod=current_user, course_id=course_id)
+⋮----
+course = await svc.update_course(hod=current_user, course_id=course_id, payload=payload)
+⋮----
+@router.delete("/courses/{course_id}", status_code=status.HTTP_200_OK)
+async def delete_course(course_id: uuid.UUID, session: DBSession, current_user: CurrentUser) -> JSONResponse
+⋮----
+# Offerings
+⋮----
+offering = await svc.create_offering(hod=current_user, course_id=course_id, payload=payload)
+⋮----
+offerings = await svc.list_course_offerings(hod=current_user, course_id=course_id)
+⋮----
+async def get_offering(course_id: uuid.UUID, offering_id: uuid.UUID, session: DBSession, current_user: CurrentUser) -> CourseOfferingResponse
+⋮----
+await svc.get_department_course(hod=current_user, course_id=course_id)  # Validate auth scope
+offering = await svc.get_offering(offering_id)
+⋮----
+async def activate_offering(course_id: uuid.UUID, offering_id: uuid.UUID, session: DBSession, current_user: CurrentUser) -> CourseOfferingResponse
+⋮----
+offering = await svc.activate_offering(hod=current_user, course_id=course_id, offering_id=offering_id)
+⋮----
+async def assign_lecturer(course_id: uuid.UUID, offering_id: uuid.UUID, lecturer_id: uuid.UUID, session: DBSession, current_user: CurrentUser) -> CourseOfferingResponse
+⋮----
+offering = await svc.assign_lecturer(hod=current_user, course_id=course_id, offering_id=offering_id, lecturer_id=lecturer_id)
+</file>
+
+<file path="src/app/api/v1/lecturer.py">
+# src/app/api/v1/lecturer.py
+"""
+Lecturer endpoints — all protected routes for the lecturer role.
+"""
+⋮----
+router = APIRouter(
+⋮----
+_NOT_IMPLEMENTED = JSONResponse(
+⋮----
+# ---------------------------------------------------------------------------
+# Courses
+⋮----
+@router.get("/courses", response_model=list[CourseOfferingResponse])
+async def list_courses(current_user: AuthorizedLecturer, session: DBSession)
+⋮----
+svc = LecturerService(session)
+⋮----
+@router.get("/courses/{course_id}", response_model=CourseOfferingResponse)
+async def get_course(course_id: uuid.UUID, current_user: AuthorizedLecturer, session: DBSession)
+⋮----
+# Students
+⋮----
+@router.get("/courses/{course_id}/students", response_model=list[dict])
+async def list_students(course_id: uuid.UUID, current_user: AuthorizedLecturer, session: DBSession)
+⋮----
+registrations = await svc.list_students(current_user, course_id)
+⋮----
+reg = await svc.approve_student(current_user, course_id, student_id)
+⋮----
+# Materials
+⋮----
+storage_svc = StorageService()
+# Read and upload file concurrently or synchronously depending on the client
+file_url = storage_svc.upload_file(file.file, file.filename, file.content_type)
+⋮----
+payload = MaterialCreate(title=title, type=type, visibility=visibility, file_url=file_url)
+⋮----
+# Tasks
+⋮----
+@router.get("/courses/{course_id}/tasks", response_model=list[TaskResponse])
+async def list_tasks(course_id: uuid.UUID, current_user: AuthorizedLecturer, session: DBSession)
+⋮----
+file_url = payload.get("file_url", "")
+⋮----
+enabled = payload.get("enabled", False)
+⋮----
+# Questions
+⋮----
+# Submissions
+⋮----
+count = await svc.approve_ai_grades(current_user, course_id, task_id)
+⋮----
+# Sessions
+⋮----
+sess = await svc.create_session(current_user, course_id, payload)
+⋮----
+sess = await svc.update_session(current_user, course_id, session_id, payload)
+⋮----
+@router.get("/courses/{course_id}/sessions", response_model=list[ClassSessionResponse])
+async def list_sessions(course_id: uuid.UUID, current_user: AuthorizedLecturer, session: DBSession)
+⋮----
+sessions = await svc.list_sessions(current_user, course_id)
+⋮----
+sess = await svc.get_session(current_user, course_id, session_id)
+data = ClassSessionResponse.model_validate(sess)
+⋮----
+# Announcements
+⋮----
+# Gradebook
+⋮----
+@router.get("/courses/{course_id}/gradebook", response_model=list[GradebookEntryResponse])
+async def get_gradebook(course_id: uuid.UUID, current_user: AuthorizedLecturer, session: DBSession)
+⋮----
+# Analytics & AI Tutor
+⋮----
+@router.get("/analytics", response_model=LecturerGlobalAnalytics, status_code=status.HTTP_200_OK)
+async def get_analytics(current_user: AuthorizedLecturer, session: DBSession)
+⋮----
+svc = AnalyticsService(session)
+⋮----
+@router.get("/courses/{course_id}/analytics", response_model=LecturerCourseAnalytics, status_code=status.HTTP_200_OK)
+async def get_course_analytics(course_id: uuid.UUID, _: AuthorizedLecturer, session: DBSession)
+⋮----
+svc = AITutorService(session)
+</file>
+
+<file path="src/app/api/v1/shared.py">
+# src/app/api/v1/shared.py
+"""
+Shared endpoints — accessible to multiple roles.
+
+All routes in this module currently return 501 Not Implemented.
+They will be fleshed out in Phase 6 (Materials) and Phase 10 (Notifications).
+"""
+⋮----
+router = APIRouter(
+⋮----
+_NOT_IMPLEMENTED = JSONResponse(
+⋮----
+async def download_material(material_id: uuid.UUID, session: DBSession, current_user: CurrentUser) -> JSONResponse
+⋮----
+svc = SharedService(session)
+url = await svc.get_material_download_url(current_user, material_id)
+⋮----
+count = await svc.notification_repo.get_unread_count(current_user.id)
+⋮----
+async def mark_notification_read(notification_id: uuid.UUID, session: DBSession, current_user: CurrentUser) -> JSONResponse
+</file>
+
+<file path="src/app/api/v1/student.py">
+# src/app/api/v1/student.py
+"""
+Student endpoints — all protected routes for the student role.
+"""
+⋮----
+router = APIRouter(
+⋮----
+dependencies=[],  # We inject current_user specific dependencies per endpoint or via group
+⋮----
+_NOT_IMPLEMENTED = JSONResponse(
+⋮----
+# ---------------------------------------------------------------------------
+# Student Registration & Browsing (From Phase 4)
+⋮----
+@router.get("/courses", response_model=list[CourseOfferingResponse])
+async def list_available_courses(session: DBSession)
+⋮----
+svc = CourseService(session)
+⋮----
+@router.get("/courses/{offering_id}", response_model=CourseOfferingResponse)
+async def get_course_offering(offering_id: uuid.UUID, session: DBSession)
+⋮----
+@router.post("/courses/{offering_id}/register", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_active_semester)])
+async def register_for_course(offering_id: uuid.UUID, current_user: AuthorizedStudent, session: DBSession)
+⋮----
+reg = await svc.register_student(current_user, offering_id)
+⋮----
+@router.delete("/courses/{offering_id}/register", status_code=status.HTTP_200_OK, dependencies=[Depends(require_active_semester)])
+async def drop_course(offering_id: uuid.UUID, current_user: AuthorizedStudent, session: DBSession)
+⋮----
+@router.get("/student/courses", response_model=list[CourseOfferingResponse])
+async def get_registered_courses(current_user: AuthorizedStudent, session: DBSession)
+⋮----
+# Materials
+⋮----
+svc = StudentService(session)
+⋮----
+# Tasks
+⋮----
+# Answers data must be dicts
+answers_data = [ans.model_dump() for ans in payload.answers]
+sub = await svc.submit_task(current_user, course_id, task_id, answers_data)
+⋮----
+# Grades
+⋮----
+# Announcements
+⋮----
+anns = await svc.list_announcements(current_user, course_id, pinned_only=pinned or False)
+results = []
+⋮----
+data = StudentAnnouncementResponse.model_validate(ann)
+⋮----
+ann = await svc.get_announcement(current_user, course_id, announcement_id)
+⋮----
+# Sessions
+⋮----
+data = await svc.get_session(current_user, course_id, session_id)
+⋮----
+# Attendance
+⋮----
+# Analytics & AI Tutor
+⋮----
+async def get_analytics(current_user: AuthorizedStudent, session: DBSession)
+⋮----
+svc = AnalyticsService(session)
+⋮----
+svc = AITutorService(session)
+</file>
+
+<file path="src/app/api/__init__.py">
+# src/app/api/__init__.py
+</file>
+
+<file path="src/app/api/router.py">
+# src/app/api/router.py
+"""
+Central API router — mounts all versioned sub-routers.
+
+To add a new feature router:
+    1. Create src/app/api/v1/<feature>.py with an APIRouter.
+    2. Import it here and add to api_router.
+"""
+⋮----
+api_router = APIRouter(prefix="/api/v1")
+⋮----
+# Health probes — no auth, no prefix beyond /api/v1
+⋮----
+# Auth — register/student, register/lecturer, login, refresh, logout, /me
+⋮----
+# Role-scoped routes
+⋮----
+# Shared — materials download, notifications
+</file>
+
+<file path="src/app/models/__init__.py">
+# src/app/models/__init__.py
+"""
+ORM model registry.
+
+Import all models here so that Alembic's autogenerate can detect them
+via the metadata attached to Base. Order matters for FK resolution.
+"""
+⋮----
+__all__ = [
+</file>
+
+<file path="src/app/models/academic_session.py">
+# src/app/models/academic_session.py
+"""
+AcademicSession and Semester ORM models.
+
+AcademicSession: e.g. "2024/2025" — contains two Semesters.
+Semester:        first | second — only one is active globally at any time.
+"""
+⋮----
+class SemesterName(StrEnum)
+⋮----
+FIRST = "first"
+SECOND = "second"
+⋮----
+class AcademicSession(Base, TimestampMixin)
+⋮----
+"""An academic session, e.g. "2024/2025"."""
+⋮----
+__tablename__ = "academic_sessions"
+⋮----
+id: Mapped[uuid.UUID] = mapped_column(
+name: Mapped[str] = mapped_column(
+⋮----
+semesters: Mapped[list[Semester]] = relationship(
+⋮----
+def __repr__(self) -> str
+⋮----
+class Semester(Base)
+⋮----
+"""A semester within an AcademicSession.
+
+    Only one Semester.is_active may be True globally at any time.
+    Admin controls activation; activating one automatically deactivates others.
+    """
+⋮----
+__tablename__ = "semesters"
+⋮----
+academic_session_id: Mapped[uuid.UUID] = mapped_column(
+⋮----
+start_date: Mapped[date] = mapped_column(Date, nullable=False)
+end_date: Mapped[date] = mapped_column(Date, nullable=False)
+is_active: Mapped[bool] = mapped_column(
+⋮----
+academic_session: Mapped[AcademicSession] = relationship(
+</file>
+
+<file path="src/app/models/announcement.py">
+# src/app/models/announcement.py
+"""
+Announcement and AnnouncementView ORM models.
+
+Announcement:     A lecturer's post to a CourseOffering.
+AnnouncementView: Records when a student has viewed an announcement.
+"""
+⋮----
+class Announcement(Base, TimestampMixin)
+⋮----
+"""A course announcement made by a lecturer."""
+⋮----
+__tablename__ = "announcements"
+⋮----
+id: Mapped[uuid.UUID] = mapped_column(
+offering_id: Mapped[uuid.UUID] = mapped_column(
+lecturer_id: Mapped[uuid.UUID] = mapped_column(
+title: Mapped[str] = mapped_column(String(200), nullable=False)
+body: Mapped[str] = mapped_column(Text, nullable=False)
+pinned: Mapped[bool] = mapped_column(
+⋮----
+def __repr__(self) -> str
+⋮----
+class AnnouncementView(Base)
+⋮----
+"""Records that a student has read an announcement."""
+⋮----
+__tablename__ = "announcement_views"
+⋮----
+announcement_id: Mapped[uuid.UUID] = mapped_column(
+student_id: Mapped[uuid.UUID] = mapped_column(
+viewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+</file>
+
+<file path="src/app/models/base.py">
+# src/app/models/base.py
+"""
+Shared SQLAlchemy base and mixins inherited by all ORM models.
+
+All models MUST:
+    class MyModel(Base, TimestampMixin):
+        __tablename__ = "my_table"
+        ...
+
+Never use the legacy Column() API — always use Mapped[T] + mapped_column().
+"""
+⋮----
+class Base(DeclarativeBase)
+⋮----
+"""Shared declarative base for all ORM models.
+
+    Alembic's autogenerate reads ``Base.metadata`` to detect schema changes.
+    All models must be imported in ``src/app/models/__init__.py`` so their
+    tables are registered before any migration runs.
+    """
+⋮----
+class TimestampMixin
+⋮----
+"""Mixin that adds server-managed ``created_at`` / ``updated_at`` columns.
+
+    * ``created_at`` is set once by the DB server on INSERT.
+    * ``updated_at`` is set by the DB server on INSERT and refreshed on UPDATE.
+
+    Both columns are timezone-aware and non-nullable.
+    """
+⋮----
+created_at: Mapped[datetime] = mapped_column(
+updated_at: Mapped[datetime] = mapped_column(
+</file>
+
+<file path="src/app/models/class_session.py">
+# src/app/models/class_session.py
+"""
+ClassSession and Attendance ORM models.
+
+ClassSession: A scheduled class event owned by the creating lecturer.
+Attendance:   Per-student attendance record for a ClassSession.
+"""
+⋮----
+class ClassSession(Base, TimestampMixin)
+⋮----
+"""A class session (lecture, lab, seminar) for a CourseOffering.
+
+    Owned by the lecturer who created it. Only the owner may:
+      - Edit the session
+      - Cancel the session
+      - Mark attendance
+    """
+⋮----
+__tablename__ = "class_sessions"
+⋮----
+id: Mapped[uuid.UUID] = mapped_column(
+offering_id: Mapped[uuid.UUID] = mapped_column(
+lecturer_id: Mapped[uuid.UUID] = mapped_column(
+title: Mapped[str] = mapped_column(String(200), nullable=False)
+scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+venue: Mapped[str | None] = mapped_column(String(200), nullable=True, default=None)
+status: Mapped[str] = mapped_column(
+notes: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+⋮----
+def __repr__(self) -> str
+⋮----
+class Attendance(Base)
+⋮----
+"""Attendance record for a student in a ClassSession.
+
+    Only the session owner (ClassSession.lecturer_id) may create records.
+    """
+⋮----
+__tablename__ = "attendance"
+⋮----
+session_id: Mapped[uuid.UUID] = mapped_column(
+student_id: Mapped[uuid.UUID] = mapped_column(
+⋮----
+marked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+marked_by: Mapped[uuid.UUID] = mapped_column(
+</file>
+
+<file path="src/app/models/course.py">
+# src/app/models/course.py
+"""
+Course, CourseOffering, and CourseRegistration ORM models.
+
+Course:             The canonical course definition (belongs to a Department).
+CourseOffering:     An instance of a Course for a specific Semester.
+CourseRegistration: A student's enrolment in a CourseOffering.
+"""
+⋮----
+class Course(Base, TimestampMixin)
+⋮----
+"""Course definition — independent of semester."""
+⋮----
+__tablename__ = "courses"
+⋮----
+id: Mapped[uuid.UUID] = mapped_column(
+department_id: Mapped[uuid.UUID] = mapped_column(
+title: Mapped[str] = mapped_column(String(200), nullable=False)
+code: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+description: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+units: Mapped[int] = mapped_column(Integer, nullable=False)
+⋮----
+def __repr__(self) -> str
+⋮----
+class CourseOffering(Base)
+⋮----
+"""A course scheduled for a specific semester, optionally assigned to a lecturer."""
+⋮----
+__tablename__ = "course_offerings"
+⋮----
+course_id: Mapped[uuid.UUID] = mapped_column(
+semester_id: Mapped[uuid.UUID] = mapped_column(
+lecturer_id: Mapped[uuid.UUID | None] = mapped_column(
+is_active: Mapped[bool] = mapped_column(
+⋮----
+class CourseRegistration(Base, TimestampMixin)
+⋮----
+"""A student's registration in a CourseOffering.
+
+    Status starts as 'pending'; lecturer must approve.
+    """
+⋮----
+__tablename__ = "course_registrations"
+⋮----
+offering_id: Mapped[uuid.UUID] = mapped_column(
+student_id: Mapped[uuid.UUID] = mapped_column(
+status: Mapped[str] = mapped_column(
+</file>
+
+<file path="src/app/models/department.py">
+# src/app/models/department.py
+"""
+Department ORM model.
+
+A Department belongs to a Faculty and is managed by a HOD (FK → User).
+"""
+⋮----
+class Department(Base, TimestampMixin)
+⋮----
+"""Represents an academic department (e.g. "Computer Science")."""
+⋮----
+__tablename__ = "departments"
+⋮----
+id: Mapped[uuid.UUID] = mapped_column(
+faculty_id: Mapped[uuid.UUID] = mapped_column(
+name: Mapped[str] = mapped_column(String(200), nullable=False)
+code: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+hod_id: Mapped[uuid.UUID | None] = mapped_column(
+⋮----
+def __repr__(self) -> str
+</file>
+
+<file path="src/app/models/faculty.py">
+# src/app/models/faculty.py
+"""
+Faculty ORM model.
+
+A Faculty is the top-level academic grouping. It contains many Departments.
+"""
+⋮----
+class Faculty(Base, TimestampMixin)
+⋮----
+"""Represents an academic faculty (e.g. "Faculty of Engineering")."""
+⋮----
+__tablename__ = "faculties"
+⋮----
+id: Mapped[uuid.UUID] = mapped_column(
+name: Mapped[str] = mapped_column(String(200), nullable=False)
+code: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+⋮----
+def __repr__(self) -> str
+</file>
+
+<file path="src/app/models/gradebook.py">
+# src/app/models/gradebook.py
+"""
+GradebookEntry and AITutorRule ORM models.
+
+GradebookEntry: Manual/holistic grade a lecturer assigns to a student per offering.
+AITutorRule:    Custom instructions for the AI tutor for a specific CourseOffering.
+"""
+⋮----
+class GradebookEntry(Base)
+⋮----
+"""A manual gradebook entry for a student in a CourseOffering."""
+⋮----
+__tablename__ = "gradebook_entries"
+⋮----
+id: Mapped[uuid.UUID] = mapped_column(
+offering_id: Mapped[uuid.UUID] = mapped_column(
+student_id: Mapped[uuid.UUID] = mapped_column(
+manual_grade: Mapped[str | None] = mapped_column(String(20), nullable=True, default=None)
+notes: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+updated_at: Mapped[datetime] = mapped_column(
+⋮----
+def __repr__(self) -> str
+⋮----
+class AITutorRule(Base)
+⋮----
+"""Custom AI tutor instructions for a CourseOffering (one row per offering)."""
+⋮----
+__tablename__ = "ai_tutor_rules"
+⋮----
+rules: Mapped[str] = mapped_column(Text, nullable=False)
+</file>
+
+<file path="src/app/models/material.py">
+# src/app/models/material.py
+"""
+Material ORM model.
+
+Materials are files uploaded to a CourseOffering.
+Visibility controls who may see them and whether they may be indexed for AI.
+"""
+⋮----
+class Material(Base, TimestampMixin)
+⋮----
+"""A file resource uploaded for a CourseOffering.
+
+    visibility:
+        students_only — visible to enrolled students only; cannot be AI-indexed.
+        ai_only       — used only for AI grounding; not shown to students.
+        both          — visible to students and available for AI indexing.
+    """
+⋮----
+__tablename__ = "materials"
+⋮----
+id: Mapped[uuid.UUID] = mapped_column(
+offering_id: Mapped[uuid.UUID] = mapped_column(
+uploaded_by: Mapped[uuid.UUID] = mapped_column(
+title: Mapped[str] = mapped_column(String(200), nullable=False)
+type: Mapped[str] = mapped_column(
+file_url: Mapped[str] = mapped_column(String(1000), nullable=False)
+visibility: Mapped[str] = mapped_column(
+indexed: Mapped[bool] = mapped_column(
+indexed_at: Mapped[datetime | None] = mapped_column(
+⋮----
+def __repr__(self) -> str
+</file>
+
+<file path="src/app/models/notification.py">
+# src/app/models/notification.py
+"""
+Notification ORM model.
+
+In-app notifications pushed to individual users.
+"""
+⋮----
+class Notification(Base, TimestampMixin)
+⋮----
+"""An in-app notification for a specific user."""
+⋮----
+__tablename__ = "notifications"
+⋮----
+id: Mapped[uuid.UUID] = mapped_column(
+user_id: Mapped[uuid.UUID] = mapped_column(
+message: Mapped[str] = mapped_column(Text, nullable=False)
+type: Mapped[str] = mapped_column(String(50), nullable=False)
+read: Mapped[bool] = mapped_column(
+link: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
+⋮----
+def __repr__(self) -> str
+</file>
+
+<file path="src/app/models/task.py">
+# src/app/models/task.py
+"""
+Task, Question, Submission, and Answer ORM models.
+
+Task:       An assignment attached to a CourseOffering (optionally to a ClassSession).
+Question:   A single question within a Task; all questions share the task's type.
+Submission: A student's submission for a Task.
+Answer:     A student's response to one Question within a Submission.
+"""
+⋮----
+class Task(Base, TimestampMixin)
+⋮----
+"""An assignment / assessment for a CourseOffering.
+
+    totalScore is computed (sum of question scores) — never stored here.
+    """
+⋮----
+__tablename__ = "tasks"
+⋮----
+id: Mapped[uuid.UUID] = mapped_column(
+offering_id: Mapped[uuid.UUID] = mapped_column(
+session_id: Mapped[uuid.UUID | None] = mapped_column(
+title: Mapped[str] = mapped_column(String(200), nullable=False)
+description: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+due_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+ai_grading: Mapped[bool] = mapped_column(
+marking_guide_url: Mapped[str | None] = mapped_column(String(1000), nullable=True, default=None)
+⋮----
+def __repr__(self) -> str
+⋮----
+class Question(Base)
+⋮----
+"""A single question within a Task.
+
+    All questions in a Task share the same type (enforced by service logic).
+    options is only populated for MCQ questions.
+    """
+⋮----
+__tablename__ = "questions"
+⋮----
+task_id: Mapped[uuid.UUID] = mapped_column(
+text: Mapped[str] = mapped_column(Text, nullable=False)
+type: Mapped[str] = mapped_column(
+score: Mapped[float] = mapped_column(Float, nullable=False)
+options: Mapped[list[str] | None] = mapped_column(
+⋮----
+class Submission(Base)
+⋮----
+"""A student's submission for a Task."""
+⋮----
+__tablename__ = "submissions"
+⋮----
+student_id: Mapped[uuid.UUID] = mapped_column(
+submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+grading_status: Mapped[str] = mapped_column(
+total_score: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+graded_at: Mapped[datetime | None] = mapped_column(
+⋮----
+class Answer(Base)
+⋮----
+"""A student's response to a single Question within a Submission."""
+⋮----
+__tablename__ = "answers"
+⋮----
+submission_id: Mapped[uuid.UUID] = mapped_column(
+question_id: Mapped[uuid.UUID] = mapped_column(
+selected_option: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
+text_answer: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+file_url: Mapped[str | None] = mapped_column(String(1000), nullable=True, default=None)
+score: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+feedback: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+</file>
+
+<file path="src/app/models/user.py">
+# src/app/models/user.py
+"""
+User ORM model — AMS domain version.
+
+A User is an authenticated principal with one of four roles:
+  student | lecturer | hod | admin
+
+Passwords are NEVER stored in plain text — only the bcrypt hash goes here.
+"""
+⋮----
+class UserRole(StrEnum)
+⋮----
+"""Role enum for the User model."""
+⋮----
+STUDENT = "student"
+LECTURER = "lecturer"
+HOD = "hod"
+ADMIN = "admin"
+⋮----
+class User(Base, TimestampMixin)
+⋮----
+"""Represents an authenticated AMS user.
+
+    Columns
+    -------
+    id              UUID primary key (generated at creation time).
+    email           Unique, indexed login identifier.
+    hashed_password Bcrypt hash (cost 12). Never returned in responses.
+    first_name      Given name.
+    last_name       Family name.
+    role            One of: student | lecturer | hod | admin.
+    department_id   FK → Department (nullable; FK constraint added in Phase 3).
+    phone           Optional contact number.
+    avatar          Optional URL to profile image.
+    is_active       Soft-disable without deleting the record.
+
+    Student-only
+    ------------
+    admission_year  The calendar year of admission (e.g. 2021).
+    level_offset    Adjustment for deferrals/repeats (default 0).
+
+    Lecturer-only
+    -------------
+    staff_id        Institution staff identifier.
+    is_authorized   Set to True by Admin before lecturer can access routes.
+    """
+⋮----
+__tablename__ = "users"
+⋮----
+id: Mapped[uuid.UUID] = mapped_column(
+email: Mapped[str] = mapped_column(
+hashed_password: Mapped[str] = mapped_column(
+first_name: Mapped[str] = mapped_column(
+last_name: Mapped[str] = mapped_column(
+role: Mapped[str] = mapped_column(
+# FK to Department — stored as UUID; FK constraint added in Phase 3 migration
+department_id: Mapped[uuid.UUID | None] = mapped_column(
+phone: Mapped[str | None] = mapped_column(
+avatar: Mapped[str | None] = mapped_column(
+is_active: Mapped[bool] = mapped_column(
+⋮----
+# ------------------------------------------------------------------
+# Student-only fields
+⋮----
+admission_year: Mapped[int | None] = mapped_column(
+level_offset: Mapped[int | None] = mapped_column(
+⋮----
+# Lecturer-only fields
+⋮----
+staff_id: Mapped[str | None] = mapped_column(
+is_authorized: Mapped[bool | None] = mapped_column(
+⋮----
+def __repr__(self) -> str
+</file>
+
+<file path="src/app/repositories/__init__.py">
+# src/app/repositories/__init__.py
+</file>
+
+<file path="src/app/repositories/base.py">
+# src/app/repositories/base.py
+"""
+Generic async CRUD base repository.
+
+All domain repositories inherit from BaseRepository[ModelT] and call
+``super().__init__(ModelT, session)`` to bind the model class.
+
+Rules:
+- Zero business logic here — pure DB access only.
+- Always use ``select()`` + ``session.scalars()``; never ``Session.query()``.
+- No raw SQL; ORM-only to prevent SQL injection by design.
+"""
+⋮----
+ModelT = TypeVar("ModelT", bound=Base)
+⋮----
+class BaseRepository[ModelT: Base]
+⋮----
+"""Typed async CRUD repository.
+
+    Parameters
+    ----------
+    model:
+        The SQLAlchemy ORM class this repository manages.
+    session:
+        The injected ``AsyncSession`` for the current request.
+    """
+⋮----
+def __init__(self, model: type[ModelT], session: AsyncSession) -> None
+⋮----
+# ------------------------------------------------------------------
+# Read
+⋮----
+async def get_by_id(self, pk: Any) -> ModelT | None
+⋮----
+"""Return a single row by primary key, or ``None`` if not found."""
+⋮----
+"""Return a page of rows and the total count.
+
+        Returns
+        -------
+        (rows, total):
+            ``rows`` — the current page; ``total`` — count of all matching rows.
+        """
+total_scalar = await self._session.scalar(
+⋮----
+select(func.count()).select_from(self._model)  # type: ignore[arg-type]
+⋮----
+total = int(total_scalar or 0)
+⋮----
+result = await self._session.scalars(select(self._model).offset(offset).limit(limit))
+⋮----
+# Write
+⋮----
+async def create(self, **values: Any) -> ModelT
+⋮----
+"""Persist a new row and return the refreshed ORM instance."""
+instance = self._model(**values)
+⋮----
+await self._session.flush()  # write to DB within the transaction
+await self._session.refresh(instance)  # load server-generated values
+⋮----
+async def update(self, instance: ModelT, **values: Any) -> ModelT
+⋮----
+"""Apply ``values`` to ``instance``, flush, and return the updated row."""
+⋮----
+async def delete(self, instance: ModelT) -> None
+⋮----
+"""Delete ``instance`` from the DB within the current transaction."""
+</file>
+
+<file path="src/app/repositories/token.py">
+# src/app/repositories/token.py
+"""
+Redis-backed refresh token repository.
+
+Refresh tokens are opaque UUIDs stored as Redis keys with a TTL.
+Key format: ``refresh_token:{token_uuid}``
+Value: user UUID as string
+
+On logout or any security event, the key is deleted to immediately
+invalidate the token — no need to wait for expiry.
+"""
+⋮----
+_KEY_PREFIX = "refresh_token"
+_RESET_KEY_PREFIX = "reset_token"
+⋮----
+def _key(token: str) -> str
+⋮----
+def _reset_key(token: str) -> str
+⋮----
+class RefreshTokenRepository
+⋮----
+"""Async CRUD operations for refresh tokens stored in Redis."""
+⋮----
+async def store(self, user_id: uuid.UUID) -> str
+⋮----
+"""Create a new refresh token and persist it with a TTL.
+
+        Returns
+        -------
+        str
+            The opaque refresh token string (a UUID4) to return to the client.
+        """
+token = str(uuid.uuid4())
+ttl_seconds = settings.REFRESH_TOKEN_EXPIRE_DAYS * 86_400
+⋮----
+async def get_user_id(self, token: str) -> str | None
+⋮----
+"""Return the user ID string linked to the refresh token, or ``None``."""
+result: str | None = await redis_pool.get(_key(token))
+⋮----
+async def revoke(self, token: str) -> None
+⋮----
+"""Delete the refresh token from Redis (immediate invalidation)."""
+⋮----
+async def store_reset_token(self, email: str) -> str
+⋮----
+"""Create a new password reset token and persist it with a short TTL."""
+⋮----
+# e.g. 1 hour TTL
+ttl_seconds = 3600
+⋮----
+async def verify_reset_token(self, token: str) -> str | None
+⋮----
+"""Return the email linked to the reset token, deleting it on use."""
+key = _reset_key(token)
+email = await redis_pool.get(key)
+</file>
+
+<file path="src/app/repositories/user.py">
+# src/app/repositories/user.py
+"""
+UserRepository — async DB access for the User model.
+
+Only DB queries live here. Business logic (e.g. password hashing,
+uniqueness error messaging) belongs in UserService / AuthService.
+"""
+⋮----
+class UserRepository(BaseRepository[User])
+⋮----
+"""Async repository for the ``users`` table."""
+⋮----
+def __init__(self, session: AsyncSession) -> None
+⋮----
+# ------------------------------------------------------------------
+# Domain-specific lookups
+⋮----
+async def get_by_email(self, email: str) -> User | None
+⋮----
+"""Return the user with the given email, or ``None``."""
+result = await self._session.scalars(select(User).where(User.email == email).limit(1))
+⋮----
+async def get_by_id(self, pk: uuid.UUID) -> User | None:  # type: ignore[override]
+⋮----
+"""Override to narrow the ``pk`` type to ``uuid.UUID``."""
+⋮----
+async def exists_by_email(self, email: str) -> bool
+⋮----
+"""Return ``True`` if a user with this email already exists."""
+result = await self._session.scalars(select(User.id).where(User.email == email).limit(1))
+⋮----
+"""Return total count and a paginated list of users."""
+⋮----
+stmt = select(User)
+count_stmt = select(func.count()).select_from(User)
+⋮----
+stmt = stmt.where(User.role == role)
+count_stmt = count_stmt.where(User.role == role)
+⋮----
+stmt = stmt.where(User.department_id == department_id)
+count_stmt = count_stmt.where(User.department_id == department_id)
+⋮----
+search_filter = or_(
+stmt = stmt.where(search_filter)
+count_stmt = count_stmt.where(search_filter)
+⋮----
+stmt = stmt.order_by(User.created_at.desc()).offset(skip).limit(limit)
+⋮----
+total = await self._session.scalar(count_stmt) or 0
+result = await self._session.scalars(stmt)
+</file>
+
+<file path="src/app/schemas/__init__.py">
+# src/app/schemas/__init__.py
+</file>
+
+<file path="src/app/schemas/auth.py">
+# src/app/schemas/auth.py
+"""
+Pydantic v2 schemas for the Auth domain.
+
+Schemas
+-------
+LoginRequest          — email + password sent on POST /auth/login
+TokenPair             — access + refresh tokens returned on login / register
+AccessTokenResponse   — access-only token returned on POST /auth/refresh
+RefreshRequest        — refresh token sent on POST /auth/refresh / logout
+TokenPayload          — decoded JWT sub field (user ID string)
+ForgotPasswordRequest — email sent on POST /auth/forgot-password
+ResetPasswordRequest  — token + new_password sent on POST /auth/reset-password
+"""
+⋮----
+class LoginRequest(BaseModel)
+⋮----
+"""Credentials submitted to POST /api/v1/auth/login."""
+⋮----
+email: EmailStr
+password: str = Field(min_length=1)
+⋮----
+class TokenPair(BaseModel)
+⋮----
+"""Returned after a successful login or registration."""
+⋮----
+access_token: str
+refresh_token: str
+token_type: str = "bearer"
+⋮----
+class AccessTokenResponse(BaseModel)
+⋮----
+"""Returned by POST /api/v1/auth/refresh."""
+⋮----
+class RefreshRequest(BaseModel)
+⋮----
+"""Body of POST /auth/refresh and POST /auth/logout."""
+⋮----
+class TokenPayload(BaseModel)
+⋮----
+"""Claims extracted from a decoded JWT.
+
+    sub holds the user's UUID as a string (standard JWT claim).
+    """
+⋮----
+sub: str
+⋮----
+class ForgotPasswordRequest(BaseModel)
+⋮----
+"""Body of POST /auth/forgot-password."""
+⋮----
+class ResetPasswordRequest(BaseModel)
+⋮----
+"""Body of POST /auth/reset-password."""
+⋮----
+token: str
+new_password: str = Field(min_length=8, max_length=128)
+</file>
+
+<file path="src/app/schemas/user.py">
+# src/app/schemas/user.py
+"""
+Pydantic v2 schemas for the User domain (AMS version).
+
+Schema hierarchy:
+    UserPublic          — API response (never exposes password / hash)
+    UserUpdate          — PATCH /auth/me (common fields)
+    LecturerUpdate      — PATCH /auth/me/lecturer (lecturer-only fields)
+    PasswordUpdate      — PATCH /auth/me/password
+    StudentRegister     — POST /auth/register/student
+    LecturerRegister    — POST /auth/register/lecturer
+"""
+⋮----
+class StudentRegister(BaseModel)
+⋮----
+"""Payload for POST /api/v1/auth/register/student."""
+⋮----
+email: EmailStr
+password: str = Field(min_length=8, max_length=128)
+first_name: str = Field(max_length=100)
+last_name: str = Field(max_length=100)
+phone: str | None = Field(default=None, max_length=30)
+department_id: uuid.UUID | None = None
+⋮----
+class LecturerRegister(BaseModel)
+⋮----
+"""Payload for POST /api/v1/auth/register/lecturer."""
+⋮----
+staff_id: str | None = Field(default=None, max_length=100)
+⋮----
+class UserUpdate(BaseModel)
+⋮----
+"""Partial profile update for PATCH /auth/me (common fields)."""
+⋮----
+first_name: str | None = Field(default=None, max_length=100)
+last_name: str | None = Field(default=None, max_length=100)
+⋮----
+avatar: str | None = Field(default=None, max_length=500)
+⋮----
+class LecturerUpdate(BaseModel)
+⋮----
+"""Lecturer-specific profile update for PATCH /auth/me/lecturer."""
+⋮----
+class StudentUpdate(BaseModel)
+⋮----
+"""Student-specific profile update for PATCH /auth/me/student."""
+⋮----
+admission_year: int | None = Field(default=None, ge=1900, le=2100)
+⋮----
+class PasswordUpdate(BaseModel)
+⋮----
+"""Payload for PATCH /auth/me/password."""
+⋮----
+current_password: str
+new_password: str = Field(min_length=8, max_length=128)
+⋮----
+class UserPublic(BaseModel)
+⋮----
+"""API response schema for a user resource.
+
+    from_attributes=True allows constructing from a SQLAlchemy ORM instance.
+    hashed_password is intentionally absent.
+    """
+⋮----
+model_config = ConfigDict(from_attributes=True)
+⋮----
+id: uuid.UUID
+⋮----
+first_name: str
+last_name: str
+role: str
+department_id: uuid.UUID | None
+phone: str | None
+avatar: str | None
+is_active: bool
+is_authorized: bool | None
+admission_year: int | None
+level_offset: int | None
+staff_id: str | None
+created_at: datetime
+updated_at: datetime
+⋮----
+class AuthorizeStaffRequest(BaseModel)
+⋮----
+"""Payload to authorize a lecturer account (Admin only)."""
+⋮----
+user_id: uuid.UUID
+⋮----
+class LevelOffsetRequest(BaseModel)
+⋮----
+"""Payload to update a student's level offset (HOD only)."""
+⋮----
+level_offset: int
+⋮----
+class UserPagination(BaseModel)
+⋮----
+"""Metadata for paginated responses."""
+⋮----
+page: int
+limit: int
+total: int
+⋮----
+class UserListResponse(BaseModel)
+⋮----
+"""Paginated list of users."""
+⋮----
+users: list[UserPublic]
+pagination: UserPagination
+</file>
+
+<file path="src/app/services/__init__.py">
+# src/app/services/__init__.py
+</file>
+
+<file path="src/app/services/auth.py">
+# src/app/services/auth.py
+"""
+AuthService — authentication and session management (AMS version).
+
+Responsibilities:
+- Register student and lecturer accounts.
+- Validate credentials on login.
+- Issue and refresh JWTs + Redis-backed refresh tokens.
+- Invalidate refresh tokens on logout.
+"""
+⋮----
+class AuthService
+⋮----
+"""Handles all authentication-related operations."""
+⋮----
+def __init__(self, session: AsyncSession) -> None
+⋮----
+# ------------------------------------------------------------------
+# Register
+⋮----
+async def register_student(self, payload: StudentRegister) -> tuple[User, TokenPair]
+⋮----
+"""Create a new student account and immediately issue a token pair."""
+user = await self._user_service.create_student(payload)
+tokens = await self._issue_token_pair(user)
+⋮----
+async def register_lecturer(self, payload: LecturerRegister) -> tuple[User, TokenPair]
+⋮----
+"""Create a new lecturer account (unauthorized) and issue a token pair."""
+user = await self._user_service.create_lecturer(payload)
+⋮----
+# Login
+⋮----
+async def login(self, payload: LoginRequest) -> TokenPair
+⋮----
+"""Validate credentials and return a token pair.
+
+        Raises
+        ------
+        UnauthorizedError
+            If the email is not found, the password is wrong, or the
+            account is deactivated.
+        """
+user = await self._user_repo.get_by_email(payload.email.lower())
+⋮----
+# Deliberately use the same error message for wrong email OR password
+# to prevent user-enumeration attacks.
+⋮----
+# Refresh
+⋮----
+async def refresh(self, refresh_token: str) -> AccessTokenResponse
+⋮----
+"""Issue a new access token given a valid refresh token.
+
+        Raises
+        ------
+        UnauthorizedError
+            If the refresh token is unknown or invalid.
+        """
+user_id_str = await self._token_repo.get_user_id(refresh_token)
+⋮----
+user_id = uuid.UUID(user_id_str)
+⋮----
+user = await self._user_repo.get_by_id(user_id)
+⋮----
+access_token = create_access_token(subject=str(user.id))
+⋮----
+# Logout
+⋮----
+async def logout(self, refresh_token: str) -> None
+⋮----
+"""Immediately revoke the refresh token.
+
+        Silently ignores unknown tokens so that double-logout is idempotent.
+        """
+⋮----
+async def forgot_password(self, email: str) -> str | None
+⋮----
+"""Issue a password reset token for an email.
+        Returns the token if the user exists, else None.
+        """
+user = await self._user_repo.get_by_email(email.lower())
+⋮----
+async def reset_password(self, token: str, new_password: str) -> None
+⋮----
+"""Verify token and update password."""
+⋮----
+email = await self._token_repo.verify_reset_token(token)
+⋮----
+user = await self._user_repo.get_by_email(email)
+⋮----
+hashed = get_password_hash(new_password)
+⋮----
+# Internal helpers
+⋮----
+async def _issue_token_pair(self, user: User) -> TokenPair
+⋮----
+"""Create both tokens and persist the refresh token in Redis."""
+⋮----
+refresh_token = await self._token_repo.store(user.id)
+</file>
+
+<file path="src/app/services/user.py">
+# src/app/services/user.py
+"""
+UserService — orchestration and business logic for the User domain (AMS version).
+
+Raises domain-specific AppExceptions (ConflictError, NotFoundError, ForbiddenError)
+which are automatically converted to JSON responses by the global handlers.
+"""
+⋮----
+class UserService
+⋮----
+"""Business logic for User operations."""
+⋮----
+def __init__(self, session: AsyncSession) -> None
+⋮----
+# ------------------------------------------------------------------
+# Registration
+⋮----
+async def create_student(self, payload: StudentRegister) -> User
+⋮----
+"""Create a new student account.
+
+        Raises
+        ------
+        ConflictError
+            If a user with the same email already exists.
+        """
+email = payload.email.lower()
+⋮----
+hashed_password = get_password_hash(payload.password)
+⋮----
+async def create_lecturer(self, payload: LecturerRegister) -> User
+⋮----
+"""Create a new lecturer account (starts unauthorized).
+
+        Raises
+        ------
+        ConflictError
+            If a user with the same email already exists.
+        """
+⋮----
+# Retrieval
+⋮----
+async def get_optional_user(self, user_id: uuid.UUID) -> User | None
+⋮----
+"""Get a user by ID, returning None if not found."""
+⋮----
+async def get_user_or_404(self, user_id: uuid.UUID) -> User
+⋮----
+"""Get a user by ID, or raise NotFoundError."""
+user = await self.repo.get_by_id(user_id)
+⋮----
+# Profile updates
+⋮----
+async def update_profile(self, user_id: uuid.UUID, payload: UserUpdate) -> User
+⋮----
+"""Update common profile fields (first_name, last_name, phone, avatar).
+
+        Raises
+        ------
+        NotFoundError
+            If the user_id does not exist.
+        """
+user = await self.get_user_or_404(user_id)
+update_data = payload.model_dump(exclude_unset=True, exclude_none=False)
+⋮----
+async def update_lecturer_profile(self, user_id: uuid.UUID, payload: LecturerUpdate) -> User
+⋮----
+"""Update lecturer-specific profile fields.
+
+        Raises
+        ------
+        NotFoundError
+            If user not found.
+        ForbiddenError
+            If the user is not a lecturer.
+        """
+⋮----
+async def update_student_profile(self, user_id: uuid.UUID, payload: StudentUpdate) -> User
+⋮----
+"""Update student-specific profile fields.
+
+        Raises
+        ------
+        NotFoundError
+            If user not found.
+        ForbiddenError
+            If the user is not a student.
+        """
+⋮----
+async def change_password(self, user_id: uuid.UUID, payload: PasswordUpdate) -> None
+⋮----
+"""Change the user's password after verifying the current one.
+
+        Raises
+        ------
+        NotFoundError
+            If user not found.
+        ForbiddenError
+            If current_password does not match stored hash.
+        """
+⋮----
+hashed = get_password_hash(payload.new_password)
+⋮----
+# Admin / HOD Actions
+⋮----
+"""List users with pagination and optional filtering."""
+skip = max(0, page - 1) * limit
+⋮----
+async def authorize_lecturer(self, user_id: uuid.UUID) -> User
+⋮----
+"""Authorize a lecturer account."""
+⋮----
+async def update_level_offset(self, student_id: uuid.UUID, offset: int) -> User
+⋮----
+"""Update a student's level offset."""
+user = await self.get_user_or_404(student_id)
+</file>
+
+<file path="src/app/dependencies.py">
+# src/app/dependencies.py
+"""
+Shared FastAPI dependency injection helpers.
+
+Import and use via:
+    from app.dependencies import CurrentUser, DBSession
+"""
+⋮----
+# HTTPBearer scheme — tells Swagger UI to expect a raw Bearer token
+bearer_scheme = HTTPBearer()
+⋮----
+"""Validate the Bearer JWT and return the authenticated User.
+
+    Steps:
+    1. Extract + decode the JWT (raises 401 if expired / invalid).
+    2. Parse subject as UUID (raises 401 if malformed).
+    3. Load the user from DB (raises 401 if not found or inactive).
+
+    Protected routers declare this at router level:
+        router = APIRouter(dependencies=[Depends(get_current_user)])
+
+    Route handlers that also need the user object inject it directly:
+        async def me(current_user: CurrentUser) -> UserPublic: ...
+    """
+user_id_str = decode_access_token(token.credentials)
+⋮----
+user_id = uuid.UUID(user_id_str)
+⋮----
+repo = UserRepository(session)
+user = await repo.get_by_id(user_id)
+⋮----
+"""Validate that the current user is a lecturer AND is authorized.
+
+    Raises
+    ------
+    ForbiddenError
+        If the user is not a lecturer or hasn't been authorized by an Admin.
+    """
+⋮----
+"""Validate that the current user is a student."""
+⋮----
+# ---------------------------------------------------------------------------
+# Annotated shorthand aliases — use these in route function signatures.
+⋮----
+# Injects and validates the current user; raises 401 on any failure.
+CurrentUser = Annotated[User, Depends(get_current_user)]
+⋮----
+# Injects and validates an authorized lecturer; raises 401/403 on failure.
+AuthorizedLecturer = Annotated[User, Depends(get_authorized_lecturer)]
+⋮----
+# Injects and validates a student; raises 401/403 on failure.
+AuthorizedStudent = Annotated[User, Depends(get_student)]
+⋮----
+# Injects a transactional DB session; auto-commits / rolls back.
+DBSession = Annotated[AsyncSession, Depends(get_db_session)]
+</file>
+
+<file path="src/app/exceptions.py">
+# src/app/exceptions.py
+"""
+Domain exception hierarchy and global FastAPI exception handlers.
+
+All custom errors inherit from ``AppException``. This allows a single
+global exception handler to catch them and format a consistent JSON response.
+"""
+⋮----
+logger = structlog.get_logger()
+⋮----
+class AppException(Exception)
+⋮----
+"""Base class for all domain-specific application errors.
+
+    Parameters
+    ----------
+    status_code:
+        HTTP status code to return (e.g., 400, 404).
+    detail:
+        Human-readable error message.
+    error_code:
+        Constant string code for the frontend to match against (e.g., "USER_NOT_FOUND").
+    """
+⋮----
+class NotFoundError(AppException)
+⋮----
+"""Raised when a requested resource is not found."""
+⋮----
+def __init__(self, detail: str = "Resource not found", error_code: str = "NOT_FOUND") -> None
+⋮----
+class ConflictError(AppException)
+⋮----
+"""Raised when a resource already exists or state conflicts."""
+⋮----
+def __init__(self, detail: str = "Resource conflict", error_code: str = "CONFLICT") -> None
+⋮----
+class UnauthorizedError(AppException)
+⋮----
+"""Raised when authentication fails or is absent."""
+⋮----
+def __init__(self, detail: str = "Not authenticated", error_code: str = "UNAUTHORIZED") -> None
+⋮----
+class ForbiddenError(AppException)
+⋮----
+"""Raised when the user lacks permission to perform an action."""
+⋮----
+def __init__(self, detail: str = "Permission denied", error_code: str = "FORBIDDEN") -> None
+⋮----
+class ValidationError(AppException)
+⋮----
+"""Raised when request data fails domain-level validation (not schema validation)."""
+⋮----
+def __init__(self, detail: str = "Validation error", error_code: str = "VALIDATION_ERROR") -> None
+⋮----
+# ---------------------------------------------------------------------------
+# Global Handlers (registered in main.py)
+⋮----
+async def app_exception_handler(_request: Request, exc: AppException) -> JSONResponse
+⋮----
+"""Handle our custom AppException and return a consistent JSON shape."""
+⋮----
+"""Handle Pydantic validation errors with a consistent 422 shape."""
+# exc.errors() returns a list of dicts like:
+# [{"loc": ("body", "email"), "msg": "value is not a valid email", "type": "value_error.email"}]
+⋮----
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse
+⋮----
+"""Catch-all for unexpected 500 errors.
+
+    Logs the stack trace server-side but never leaks it to the client.
+    """
+⋮----
+def setup_exception_handlers(app: FastAPI) -> None
+⋮----
+"""Register all global handlers on the FastAPI app instance."""
+app.add_exception_handler(AppException, app_exception_handler)  # type: ignore[arg-type]
+app.add_exception_handler(RequestValidationError, validation_exception_handler)  # type: ignore
+app.add_exception_handler(Exception, unhandled_exception_handler)  # type: ignore
+</file>
+
+</files>

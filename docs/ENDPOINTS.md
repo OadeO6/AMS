@@ -32,17 +32,17 @@
 ## Auth
 
 ```
-[ ] POST   /auth/register/student
-[ ] POST   /auth/register/lecturer
-[ ] POST   /auth/login
-[ ] POST   /auth/logout
-[ ] POST   /auth/forgot-password
-[ ] POST   /auth/reset-password
-[ ] GET    /auth/me
-[ ] PATCH  /auth/me
-[ ] PATCH  /auth/me/student
-[ ] PATCH  /auth/me/lecturer
-[ ] PATCH  /auth/me/password
+[x] POST   /auth/register/student
+[x] POST   /auth/register/lecturer
+[x] POST   /auth/login
+[x] POST   /auth/logout
+[x] POST   /auth/forgot-password
+[x] POST   /auth/reset-password
+[x] GET    /auth/me
+[x] PATCH  /auth/me
+[x] PATCH  /auth/me/student
+[x] PATCH  /auth/me/lecturer
+[x] PATCH  /auth/me/password
 ```
 → See: [`ENDPOINTS_DETAIL.md` — Auth](./ENDPOINTS_DETAIL.md#auth)
 
@@ -52,42 +52,42 @@
 
 ```
 # Course
-[ ] GET    /courses
-[ ] GET    /courses/:courseId
-[ ] POST   /courses/:courseId/register
-[ ] DELETE /courses/:courseId/register
+[x] GET    /courses
+[x] GET    /courses/:courseId
+[x] POST   /courses/:courseId/register
+[x] DELETE /courses/:courseId/register
 
-[ ] GET    /student/courses                       ?semesterId
+[x] GET    /student/courses                       ?semesterId
 
 # Materials
-[ ] GET    /student/courses/:courseId/materials   ?type
+[x] GET    /student/courses/:courseId/materials   ?type
 
 # Tasks
-[ ] GET    /student/courses/:courseId/tasks       ?status
-[ ] GET    /student/courses/:courseId/tasks/:taskId
-[ ] POST   /student/courses/:courseId/tasks/:taskId/submit
+[x] GET    /student/courses/:courseId/tasks       ?status
+[x] GET    /student/courses/:courseId/tasks/:taskId
+[x] POST   /student/courses/:courseId/tasks/:taskId/submit
 
 # Grades
-[ ] GET    /student/courses/:courseId/grades
+[x] GET    /student/courses/:courseId/grades
 
 # Announcements
-[ ] GET    /student/courses/:courseId/announcements
-[ ] GET    /student/courses/:courseId/announcements/:announcementId
-[ ] PATCH  /student/courses/:courseId/announcements/:announcementId/viewed
+[x] GET    /student/courses/:courseId/announcements
+[x] GET    /student/courses/:courseId/announcements/:announcementId
+[x] PATCH  /student/courses/:courseId/announcements/:announcementId/viewed
 
 # Sessions
-[ ] GET    /student/courses/:courseId/sessions    ?status ?lecturerId
-[ ] GET    /student/courses/:courseId/sessions/:sessionId
+[x] GET    /student/courses/:courseId/sessions    ?status ?lecturerId
+[x] GET    /student/courses/:courseId/sessions/:sessionId
 
 # Attendance
-[ ] GET    /student/courses/:courseId/attendance
+[x] GET    /student/courses/:courseId/attendance
 
-# Analytics (plan not finished)
-[ ] GET    /student/analytics
-[ ] GET    /student/courses/:courseId/analytics
+# Analytics
+[x] GET    /student/analytics
+[x] GET    /student/courses/:courseId/analytics
 
-# AI Tutor (plan not finished)
-[ ] POST   /student/courses/:courseId/ai-tutor
+# AI Tutor
+[x] POST   /student/courses/:courseId/ai-tutor
 ```
 → See: [`ENDPOINTS_DETAIL.md` — Student](./ENDPOINTS_DETAIL.md#student)
 
@@ -97,65 +97,65 @@
 
 ```
 # Courses
-[ ] GET    /lecturer/courses                      ?semesterId
-[ ] GET    /lecturer/courses/:courseId
+[x] GET    /lecturer/courses                      ?semesterId
+[x] GET    /lecturer/courses/:courseId
 
 # Students
-[ ] GET    /lecturer/courses/:courseId/students   ?status
-[ ] PATCH  /lecturer/courses/:courseId/students/:studentId/approve
+[x] GET    /lecturer/courses/:courseId/students   ?status
+[x] PATCH  /lecturer/courses/:courseId/students/:studentId/approve
 
 # Materials
-[ ] POST   /lecturer/courses/:courseId/materials
-[ ] PATCH  /lecturer/courses/:courseId/materials/:materialId
-[ ] DELETE /lecturer/courses/:courseId/materials/:materialId
-[ ] POST   /lecturer/courses/:courseId/materials/:materialId/index
+[x] POST   /lecturer/courses/:courseId/materials
+[x] PATCH  /lecturer/courses/:courseId/materials/:materialId
+[x] DELETE /lecturer/courses/:courseId/materials/:materialId
+[x] POST   /lecturer/courses/:courseId/materials/:materialId/index
 
 # Tasks
-[ ] POST   /lecturer/courses/:courseId/tasks
-[ ] PATCH  /lecturer/courses/:courseId/tasks/:taskId
-[ ] DELETE /lecturer/courses/:courseId/tasks/:taskId
-[ ] GET    /lecturer/courses/:courseId/tasks
-[ ] GET    /lecturer/courses/:courseId/tasks/:taskId
-[ ] POST   /lecturer/courses/:courseId/tasks/:taskId/marking-guide
-[ ] PATCH  /lecturer/courses/:courseId/tasks/:taskId/ai-grading
+[x] POST   /lecturer/courses/:courseId/tasks
+[x] PATCH  /lecturer/courses/:courseId/tasks/:taskId
+[x] DELETE /lecturer/courses/:courseId/tasks/:taskId
+[x] GET    /lecturer/courses/:courseId/tasks
+[x] GET    /lecturer/courses/:courseId/tasks/:taskId
+[x] POST   /lecturer/courses/:courseId/tasks/:taskId/marking-guide
+[x] PATCH  /lecturer/courses/:courseId/tasks/:taskId/ai-grading
 
 # Questions
-[ ] POST   /lecturer/courses/:courseId/tasks/:taskId/questions
-[ ] PATCH  /lecturer/courses/:courseId/tasks/:taskId/questions/:questionId
-[ ] DELETE /lecturer/courses/:courseId/tasks/:taskId/questions/:questionId
+[x] POST   /lecturer/courses/:courseId/tasks/:taskId/questions
+[x] PATCH  /lecturer/courses/:courseId/tasks/:taskId/questions/:questionId
+[x] DELETE /lecturer/courses/:courseId/tasks/:taskId/questions/:questionId
 
 # Submissions
-[ ] GET    /lecturer/courses/:courseId/tasks/:taskId/submissions            ?graded
-[ ] GET    /lecturer/courses/:courseId/tasks/:taskId/submissions/:submissionId
-[ ] PATCH  /lecturer/courses/:courseId/tasks/:taskId/submissions/:submissionId/grade
-[ ] POST   /lecturer/courses/:courseId/tasks/:taskId/submissions/approve-ai-grades
+[x] GET    /lecturer/courses/:courseId/tasks/:taskId/submissions            ?graded
+[x] GET    /lecturer/courses/:courseId/tasks/:taskId/submissions/:submissionId
+[x] PATCH  /lecturer/courses/:courseId/tasks/:taskId/submissions/:submissionId/grade
+[x] POST   /lecturer/courses/:courseId/tasks/:taskId/submissions/approve-ai-grades
 
 # Sessions
-[ ] POST   /lecturer/courses/:courseId/sessions
-[ ] PATCH  /lecturer/courses/:courseId/sessions/:sessionId
-[ ] DELETE /lecturer/courses/:courseId/sessions/:sessionId
-[ ] GET    /lecturer/courses/:courseId/sessions                             ?status
-[ ] GET    /lecturer/courses/:courseId/sessions/:sessionId
-[ ] POST   /lecturer/courses/:courseId/sessions/:sessionId/attendance
+[x] POST   /lecturer/courses/:courseId/sessions
+[x] PATCH  /lecturer/courses/:courseId/sessions/:sessionId
+[x] DELETE /lecturer/courses/:courseId/sessions/:sessionId
+[x] GET    /lecturer/courses/:courseId/sessions                             ?status
+[x] GET    /lecturer/courses/:courseId/sessions/:sessionId
+[x] POST   /lecturer/courses/:courseId/sessions/:sessionId/attendance
 
 # Announcements
-[ ] POST   /lecturer/courses/:courseId/announcements
-[ ] GET    /lecturer/courses/:courseId/announcements                        ?pinned
-[ ] GET    /lecturer/courses/:courseId/announcements/:announcementId
-[ ] PATCH  /lecturer/courses/:courseId/announcements/:announcementId
-[ ] DELETE /lecturer/courses/:courseId/announcements/:announcementId
+[x] POST   /lecturer/courses/:courseId/announcements
+[x] GET    /lecturer/courses/:courseId/announcements                        ?pinned
+[x] GET    /lecturer/courses/:courseId/announcements/:announcementId
+[x] PATCH  /lecturer/courses/:courseId/announcements/:announcementId
+[x] DELETE /lecturer/courses/:courseId/announcements/:announcementId
 
 # Gradebook
-[ ] GET    /lecturer/courses/:courseId/gradebook
-[ ] PATCH  /lecturer/courses/:courseId/gradebook/:studentId
+[x] GET    /lecturer/courses/:courseId/gradebook
+[x] PATCH  /lecturer/courses/:courseId/gradebook/:studentId
 
-# Analytics (plan not finished)
-[ ] GET    /lecturer/courses/:courseId/analytics
-[ ] GET    /lecturer/analytics
+# Analytics
+[x] GET    /lecturer/courses/:courseId/analytics
+[x] GET    /lecturer/analytics
 
-# AI Tutor (plan not finished)
-[ ] POST   /lecturer/courses/:courseId/ai-tutor
-[ ] PATCH  /lecturer/courses/:courseId/ai-tutor/rules
+# AI Tutor
+[x] POST   /lecturer/courses/:courseId/ai-tutor
+[x] PATCH  /lecturer/courses/:courseId/ai-tutor/rules
 ```
 → See: [`ENDPOINTS_DETAIL.md` — Lecturer](./ENDPOINTS_DETAIL.md#lecturer)
 
@@ -165,28 +165,28 @@
 
 ```
 # Students
-[ ] GET    /hod/students                          ?search
-[ ] GET    /hod/students/:studentId
-[ ] PATCH  /hod/students/:studentId/level-offset
+[x] GET    /hod/students                          ?search
+[x] GET    /hod/students/:studentId
+[x] PATCH  /hod/students/:studentId/level-offset
 
 # Lecturers
-[ ] GET    /hod/lecturers                         ?search
-[ ] GET    /hod/lecturers/:lecturerId
+[x] GET    /hod/lecturers                         ?search
+[x] GET    /hod/lecturers/:lecturerId
 
 # Course Definitions
-[ ] POST   /hod/courses
-[ ] GET    /hod/courses                           ?search
-[ ] GET    /hod/courses/:courseId
-[ ] PATCH  /hod/courses/:courseId
-[ ] DELETE /hod/courses/:courseId
+[x] POST   /hod/courses
+[x] GET    /hod/courses                           ?search
+[x] GET    /hod/courses/:courseId
+[x] PATCH  /hod/courses/:courseId
+[x] DELETE /hod/courses/:courseId
 
 # Offerings
-[ ] POST   /hod/courses/:courseId/offerings
-[ ] GET    /hod/courses/:courseId/offerings       ?semesterId ?isActive
-[ ] GET    /hod/courses/:courseId/offerings/:offeringId
-[ ] PATCH  /hod/courses/:courseId/offerings/:offeringId/activate
-[ ] POST   /hod/courses/:courseId/offerings/:offeringId/assign
-[ ] DELETE /hod/courses/:courseId/offerings/:offeringId/assign/:lecturerId
+[x] POST   /hod/courses/:courseId/offerings
+[x] GET    /hod/courses/:courseId/offerings       ?semesterId ?isActive
+[x] GET    /hod/courses/:courseId/offerings/:offeringId
+[x] PATCH  /hod/courses/:courseId/offerings/:offeringId/activate
+[x] POST   /hod/courses/:courseId/offerings/:offeringId/assign
+[x] DELETE /hod/courses/:courseId/offerings/:offeringId/assign/:lecturerId
 ```
 → See: [`ENDPOINTS_DETAIL.md` — HOD](./ENDPOINTS_DETAIL.md#hod)
 
@@ -196,33 +196,33 @@
 
 ```
 # Faculties
-[ ] POST   /admin/faculties
-[ ] GET    /admin/faculties
-[ ] PATCH  /admin/faculties/:facultyId
-[ ] DELETE /admin/faculties/:facultyId
+[x] POST   /admin/faculties
+[x] GET    /admin/faculties
+[x] PATCH  /admin/faculties/:facultyId
+[x] DELETE /admin/faculties/:facultyId
 
 # Departments
-[ ] POST   /admin/faculties/:facultyId/departments
-[ ] GET    /admin/faculties/:facultyId/departments
-[ ] GET    /admin/faculties/:facultyId/departments/:departmentId
-[ ] PATCH  /admin/faculties/:facultyId/departments/:departmentId
-[ ] DELETE /admin/faculties/:facultyId/departments/:departmentId
-[ ] POST   /admin/departments/:departmentId/hod
-[ ] PATCH  /admin/departments/:departmentId/hod
+[x] POST   /admin/faculties/:facultyId/departments
+[x] GET    /admin/faculties/:facultyId/departments
+[x] GET    /admin/faculties/:facultyId/departments/:departmentId
+[x] PATCH  /admin/faculties/:facultyId/departments/:departmentId
+[x] DELETE /admin/faculties/:facultyId/departments/:departmentId
+[x] POST   /admin/departments/:departmentId/hod
+[x] PATCH  /admin/departments/:departmentId/hod
 
 # Academic Calendar
-[ ] POST   /admin/academic-sessions
-[ ] GET    /admin/academic-sessions
-[ ] GET    /admin/academic-sessions/:sessionId
-[ ] PATCH  /admin/academic-sessions/:sessionId
-[ ] DELETE /admin/academic-sessions/:sessionId
-[ ] PATCH  /admin/academic-sessions/:sessionId/semesters/:semesterId/activate
-[ ] PATCH  /admin/academic-sessions/:sessionId/semesters/:semesterId
-[ ] DELETE /admin/academic-sessions/:sessionId/semesters/:semesterId
+[x] POST   /admin/academic-sessions
+[x] GET    /admin/academic-sessions
+[x] GET    /admin/academic-sessions/:sessionId
+[x] PATCH  /admin/academic-sessions/:sessionId
+[x] DELETE /admin/academic-sessions/:sessionId
+[x] PATCH  /admin/academic-sessions/:sessionId/semesters/:semesterId/activate
+[x] PATCH  /admin/academic-sessions/:sessionId/semesters/:semesterId
+[x] DELETE /admin/academic-sessions/:sessionId/semesters/:semesterId
 
 # Users
-[ ] GET    /admin/users                           ?role ?department ?search
-[ ] POST   /admin/staff/authorize
+[x] GET    /admin/users                           ?role ?department ?search
+[x] POST   /admin/staff/authorize
 ```
 → See: [`ENDPOINTS_DETAIL.md` — Admin](./ENDPOINTS_DETAIL.md#admin)
 
@@ -231,8 +231,8 @@
 ## Shared
 
 ```
-[ ] GET    /materials/:materialId/download
-[ ] GET    /notifications                         ?read
-[ ] PATCH  /notifications/:notificationId/read
+[x] GET    /materials/:materialId/download
+[x] GET    /notifications                         ?read
+[x] PATCH  /notifications/:notificationId/read
 ```
 → See: [`ENDPOINTS_DETAIL.md` — Shared](./ENDPOINTS_DETAIL.md#shared)
