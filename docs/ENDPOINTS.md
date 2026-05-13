@@ -29,6 +29,16 @@
 
 ---
 
+## System & Health
+
+```
+[x] GET    /healthz
+[x] GET    /readyz
+```
+→ See: [`ENDPOINTS_DETAIL.md` — System & Health](./ENDPOINTS_DETAIL.md#system--health)
+
+---
+
 ## Auth
 
 ```
@@ -38,6 +48,7 @@
 [x] POST   /auth/logout
 [x] POST   /auth/forgot-password
 [x] POST   /auth/reset-password
+[x] POST   /auth/refresh
 [x] GET    /auth/me
 [x] PATCH  /auth/me
 [x] PATCH  /auth/me/student
@@ -233,6 +244,9 @@
 ```
 [x] GET    /materials/:materialId/download
 [x] GET    /notifications                         ?read
-[x] PATCH  /notifications/:notificationId/read
+[x] PATCH  /notifications/read
+[x] PATCH  /notifications/read-all
+[x] POST   /notifications/device-tokens
+[x] DELETE /notifications/device-tokens/:token
 ```
 → See: [`ENDPOINTS_DETAIL.md` — Shared](./ENDPOINTS_DETAIL.md#shared)

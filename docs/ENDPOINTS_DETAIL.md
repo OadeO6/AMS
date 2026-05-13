@@ -21,6 +21,56 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 
 ---
 
+## System & Health
+
+<details>
+<summary><strong>GET /healthz</strong> — Kubernetes liveness probe</summary>
+
+**Auth:** None  
+**Response:** `200 OK`
+```json
+{
+  "status": "ok"
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /readyz</strong> — Kubernetes readiness probe</summary>
+
+**Auth:** None  
+**Response:** `200 OK` (when DB connection is healthy)
+```json
+{
+  "status": "ready",
+  "db": "connected",
+  "redis": "connected"
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /auth/refresh</strong> — Refresh access token</summary>
+
+**Auth:** None (Bearer token in body)
+**Request Body:**
+```json
+{
+  "refresh_token": "string"
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "access_token": "string",
+  "token_type": "bearer"
+}
+```
+</details>
+
+---
+
 ## Auth
 
 <details>
@@ -29,8 +79,8 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 **Request Body:**
 ```json
 {
-  "firstName": "string",
-  "lastName": "string",
+  "first_name": "string",
+  "last_name": "string",
   "email": "string",
   "password": "string",
   "staff_id": "string",
@@ -41,7 +91,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 **Response:**
 ```json
 {
-  "message": "string"
+  "access_token": "string",
+  "refresh_token": "string",
+  "token_type": "bearer"
 }
 ```
 </details>
@@ -52,8 +104,8 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 **Request Body:**
 ```json
 {
-  "firstName": "string",
-  "lastName": "string",
+  "first_name": "string",
+  "last_name": "string",
   "email": "string",
   "password": "string",
   "matric_num": "string",
@@ -65,7 +117,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 **Response:**
 ```json
 {
-  "message": "string"
+  "access_token": "string",
+  "refresh_token": "string",
+  "token_type": "bearer"
 }
 ```
 </details>
@@ -84,7 +138,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 **Response:**
 ```json
 {
-  "accessToken": "string"
+  "access_token": "string",
+  "refresh_token": "string",
+  "token_type": "bearer"
 }
 ```
 </details>
@@ -92,12 +148,16 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 <details>
 <summary><strong>POST /auth/logout</strong> — Logout current user</summary>
 
-**Response:**
+**Auth:** Bearer Token
+**Request Body:**
 ```json
 {
-  "message": "string"
+  "refresh_token": "string"
 }
 ```
+
+**Response:** 
+`204 No Content`
 </details>
 
 <details>
@@ -125,7 +185,7 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 ```json
 {
   "token": "string",
-  "newPassword": "string"
+  "new_password": "string"
 }
 ```
 
@@ -140,32 +200,20 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 <details>
 <summary><strong>GET /auth/me</strong> — Get current user profile</summary>
 
-**Response (Student):**
+**Response:**
 ```json
 {
   "id": "string",
-  "firstName": "string",
-  "lastName": "string",
+  "first_name": "string",
+  "last_name": "string",
   "email": "string",
-  "role": "student",
-  "matric_num": "string",
-  "admission_session": "string",
-  "levelOffset": 0,
-  "department": { "id": "string", "name": "string" }
-}
-```
-
-**Response (Lecturer):**
-```json
-{
-  "id": "string",
-  "firstName": "string",
-  "lastName": "string",
-  "email": "string",
-  "role": "lecturer",
-  "staff_id": "string",
-  "authorized": true,
-  "department": { "id": "string", "name": "string" }
+  "role": "string",
+  "department": { "id": "string", "name": "string" } | null,
+  "matric_num": "string | null",
+  "admission_session": "string | null",
+  "level_offset": 0 | null,
+  "staff_id": "string | null",
+  "authorized": true | null
 }
 ```
 </details>
@@ -176,8 +224,8 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 **Request Body (all optional):**
 ```json
 {
-  "firstName": "string",
-  "lastName": "string",
+  "first_name": "string",
+  "last_name": "string",
   "phone": "string",
   "avatar": "file (multipart)"
 }
@@ -187,7 +235,7 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 ```json
 {
   "message": "string",
-  "user": { "id": "string", "firstName": "string", "lastName": "string", "email": "string", ... }
+  "user": { "id": "string", "first_name": "string", "last_name": "string", "email": "string", ... }
 }
 ```
 </details>
@@ -198,9 +246,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 **Request Body:**
 ```json
 {
-  "currentPassword": "string",
-  "newPassword": "string",
-  "confirmPassword": "string"
+  "current_password": "string",
+  "new_password": "string",
+  "confirm_password": "string"
 }
 ```
 
@@ -269,8 +317,8 @@ For a concise route-list overview, see `ENDPOINTS.md`.
       "code": "string",
       "level": 0,
       "department": "string",
-      "lecturer": { "id": "string", "firstName": "string", "lastName": "string" },
-      "totalStudents": 0
+      "lecturer": { "id": "string", "first_name": "string", "last_name": "string" },
+      "total_students": 0
     }
   ],
   "pagination": { "page": 0, "limit": 0, "total": 0 }
@@ -279,9 +327,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /courses/:courseId</strong> — View single course details</summary>
+<summary><strong>GET /courses/{offering_id}</strong> — View single course details</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `offering_id`
 
 **Response:**
 ```json
@@ -292,17 +340,17 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "description": "string",
   "level": 0,
   "department": "string",
-  "lecturer": { "id": "string", "firstName": "string", "lastName": "string" },
-  "isRegistered": true,
-  "totalStudents": 0
+  "lecturer": { "id": "string", "first_name": "string", "last_name": "string" },
+  "is_registered": true,
+  "total_students": 0
 }
 ```
 </details>
 
 <details>
-<summary><strong>POST /courses/:courseId/register</strong> — Register for a course</summary>
+<summary><strong>POST /courses/{offering_id}/register</strong> — Register for a course</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `offering_id`
 
 **Response:**
 ```json
@@ -314,9 +362,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>DELETE /courses/:courseId/register</strong> — Drop course registration</summary>
+<summary><strong>DELETE /courses/{offering_id}/register</strong> — Drop course registration</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `offering_id`
 
 **Response:**
 ```json
@@ -329,7 +377,7 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 <details>
 <summary><strong>GET /student/courses</strong> — View registered courses</summary>
 
-**Query Parameters (optional):** `status` (`pending` | `approved`), `semesterId`
+**Query Parameters (optional):** `status` (`pending` | `approved`), `semester_id`
 
 **Response:**
 ```json
@@ -341,7 +389,7 @@ For a concise route-list overview, see `ENDPOINTS.md`.
       "code": "string",
       "level": 0,
       "status": "pending | approved",
-      "lecturer": { "id": "string", "firstName": "string", "lastName": "string" }
+      "lecturer": { "id": "string", "first_name": "string", "last_name": "string" }
     }
   ]
 }
@@ -349,9 +397,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /student/courses/:courseId/materials</strong> — View course materials</summary>
+<summary><strong>GET /student/courses/{offering_id}/materials</strong> — View course materials</summary>
 
-**Path Parameters:** `courseId`  
+**Path Parameters:** `offering_id`  
 **Query (optional):** `type` (`note` | `slide` | `resource`)
 
 **Response:**
@@ -362,8 +410,8 @@ For a concise route-list overview, see `ENDPOINTS.md`.
       "id": "string",
       "title": "string",
       "type": "string",
-      "fileUrl": "string",
-      "uploadedAt": "datetime",
+      "file_url": "string",
+      "uploaded_at": "datetime",
       "visibility": "string"
     }
   ]
@@ -372,9 +420,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /student/courses/:courseId/tasks</strong> — View tasks for a course</summary>
+<summary><strong>GET /student/courses/{offering_id}/tasks</strong> — View tasks for a course</summary>
 
-**Path Parameters:** `courseId`  
+**Path Parameters:** `offering_id`  
 **Query (optional):** `status` (`upcoming` | `ungraded` | `ai_draft` | `ai_approved` | `manually_graded` | `overdue`)
 
 **Response:**
@@ -384,9 +432,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
     {
       "id": "string",
       "title": "string",
-      "dueDate": "datetime",
-      "maxScore": 0,
-      "submissionStatus": "string",
+      "due_date": "datetime",
+      "max_score": 0,
+      "submission_status": "string",
       "score": 0
     }
   ]
@@ -395,9 +443,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /student/courses/:courseId/tasks/:taskId</strong> — View specific task</summary>
+<summary><strong>GET /student/courses/{offering_id}/tasks/{task_id}</strong> — View specific task</summary>
 
-**Path Parameters:** `courseId`, `taskId`
+**Path Parameters:** `offering_id`, `task_id`
 
 **Response:**
 ```json
@@ -405,8 +453,8 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "id": "string",
   "title": "string",
   "description": "string",
-  "dueDate": "datetime",
-  "totalScore": 0,
+  "due_date": "datetime",
+  "total_score": 0,
   "questions": [
     {
       "id": "string",
@@ -416,46 +464,46 @@ For a concise route-list overview, see `ENDPOINTS.md`.
       "options": ["string"]
     }
   ],
-  "submission": { "submittedAt": "datetime", "answers": [] } | null
+  "submission": { "submitted_at": "datetime", "answers": [] } | null
 }
 ```
 </details>
 
 <details>
-<summary><strong>POST /student/courses/:courseId/tasks/:taskId/submit</strong> — Submit task</summary>
+<summary><strong>POST /student/courses/{offering_id}/tasks/{task_id}/submit</strong> — Submit task</summary>
 
-**Path Parameters:** `courseId`, `taskId`  
+**Path Parameters:** `offering_id`, `task_id`  
 **Body (multipart):** `answers[]` (with appropriate fields based on question type)
 
 **Response:**
 ```json
 {
   "message": "string",
-  "submission": { "id": "string", "submittedAt": "datetime", "answersCount": 0 }
+  "submission": { "id": "string", "submitted_at": "datetime", "answers_count": 0 }
 }
 ```
 </details>
 
 <details>
-<summary><strong>GET /student/courses/:courseId/grades</strong> — View grades for a course</summary>
+<summary><strong>GET /student/courses/{offering_id}/grades</strong> — View grades for a course</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `offering_id`
 
 **Response:**
 ```json
 {
   "grades": [
     {
-      "taskId": "string",
-      "taskTitle": "string",
+      "task_id": "string",
+      "task_title": "string",
       "score": 0,
-      "maxScore": 0,
-      "gradedAt": "datetime",
+      "max_score": 0,
+      "graded_at": "datetime",
       "feedback": "string"
     }
   ],
   "summary": {
-    "totalScore": 0,
+    "total_score": 0,
     "average": 0,
     "grade": "string"
   }
@@ -464,9 +512,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /student/courses/:courseId/announcements</strong> — View course announcements</summary>
+<summary><strong>GET /student/courses/{offering_id}/announcements</strong> — View course announcements</summary>
 
-**Path Parameters:** `courseId`  
+**Path Parameters:** `offering_id`  
 **Query (optional):** `viewed`, `pinned`, `page`, `limit`
 
 **Response:**
@@ -477,8 +525,8 @@ For a concise route-list overview, see `ENDPOINTS.md`.
       "id": "string",
       "title": "string",
       "body": "string",
-      "createdAt": "datetime",
-      "lecturer": { "id": "string", "firstName": "string", "lastName": "string" },
+      "created_at": "datetime",
+      "lecturer": { "id": "string", "first_name": "string", "last_name": "string" },
       "viewed": true
     }
   ],
@@ -488,17 +536,48 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /student/courses/:courseId/attendance</strong> — View personal attendance</summary>
+<summary><strong>GET /student/courses/{offering_id}/announcements/{announcement_id}</strong> — View announcement details</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `offering_id`, `announcement_id`
+
+**Response:**
+```json
+{
+  "id": "string",
+  "title": "string",
+  "body": "string",
+  "created_at": "datetime",
+  "lecturer": {
+    "id": "string",
+    "first_name": "string",
+    "last_name": "string",
+    "name": "string"
+  },
+  "viewed": true
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /student/courses/{offering_id}/announcements/{announcement_id}/viewed</strong> — Mark announcement as viewed</summary>
+
+**Path Parameters:** `offering_id`, `announcement_id`
+
+**Response:** `204 No Content`
+</details>
+
+<details>
+<summary><strong>GET /student/courses/{offering_id}/attendance</strong> — View personal attendance</summary>
+
+**Path Parameters:** `offering_id`
 
 **Response:**
 ```json
 {
   "attendance": [
     {
-      "sessionId": "string",
-      "sessionDate": "datetime",
+      "session_id": "string",
+      "session_date": "datetime",
       "status": "present | absent"
     }
   ],
@@ -513,9 +592,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /student/courses/:courseId/sessions</strong> — View course sessions</summary>
+<summary><strong>GET /student/courses/{offering_id}/sessions</strong> — View course sessions</summary>
 
-**Path Parameters:** `courseId`  
+**Path Parameters:** `offering_id`  
 **Query (optional):** `status` (`upcoming` | `completed` | `cancelled`)
 
 **Response:**
@@ -525,11 +604,11 @@ For a concise route-list overview, see `ENDPOINTS.md`.
     {
       "id": "string",
       "title": "string",
-      "scheduledAt": "datetime",
+      "scheduled_at": "datetime",
       "venue": "string",
       "status": "string",
       "attended": true | null,
-      "lecturer": { "id": "string", "firstName": "string", "lastName": "string" }
+      "lecturer": { "id": "string", "first_name": "string", "last_name": "string" }
     }
   ]
 }
@@ -537,9 +616,29 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /student/courses/:courseId/sessions/:sessionId</strong> — View specific session</summary>
+<summary><strong>GET /student/courses/{offering_id}/sessions/{session_id}</strong> — View specific session</summary>
 
-**Path Parameters:** `courseId`, `sessionId`
+**Path Parameters:** `offering_id`, `session_id`
+
+**Response:** `200 OK`
+```json
+{
+  "session": {
+    "id": "string",
+    "offering_id": "string",
+    "title": "string",
+    "scheduled_at": "datetime",
+    "venue": "string",
+    "status": "upcoming | completed | cancelled",
+    "notes": "string | null",
+    "lecturer": { "id": "string", "first_name": "string", "last_name": "string" }
+  },
+  "attendance": {
+    "marked": true,
+    "attended": true
+  }
+}
+```
 </details>
 
 <details>
@@ -547,18 +646,19 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /student/courses/:courseId/analytics</strong> — View course analytics (planned)</summary>
+<summary><strong>GET /student/courses/{offering_id}/analytics</strong> — View course analytics (planned)</summary>
 </details>
 
 <details>
-<summary><strong>POST /student/courses/:courseId/ai-tutor</strong> — Chat with AI tutor (planned)</summary>
+<summary><strong>POST /student/courses/{offering_id}/ai-tutor</strong> — Chat with AI tutor (planned)</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `offering_id`
 
 **Request Body:**
 ```json
 {
   "message": "string",
+  "context_material_id": "string (uuid) | null",
   "history": [{ "role": "user | assistant", "content": "string" }]
 }
 ```
@@ -587,8 +687,8 @@ For a concise route-list overview, see `ENDPOINTS.md`.
       "title": "string",
       "code": "string",
       "level": 0,
-      "totalStudents": 0,
-      "isActive": true,
+      "total_students": 0,
+      "is_active": true,
       "lecturers": [{ "id": "string", "name": "string" }]
     }
   ]
@@ -597,9 +697,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /lecturer/courses/:courseId</strong> — View details of an assigned course</summary>
+<summary><strong>GET /lecturer/courses/{offering_id}</strong> — View details of an assigned course</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `offering_id`
 
 **Response:**
 ```json
@@ -611,17 +711,17 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "lecturers": [{ "id": "string", "name": "string" }],
   "description": "string",
   "department": "string",
-  "totalStudents": 0,
+  "total_students": 0,
   "sessions": 0,
-  "tasksCount": 0
+  "tasks_count": 0
 }
 ```
 </details>
 
 <details>
-<summary><strong>GET /lecturer/courses/:courseId/students</strong> — View all students in a course</summary>
+<summary><strong>GET /lecturer/courses/{offering_id}/students</strong> — View all students in a course</summary>
 
-**Path Parameters:** `courseId`  
+**Path Parameters:** `offering_id`  
 **Query Parameters (optional):** `status` (enum: `pending` | `approved`)
 
 **Response:**
@@ -630,10 +730,10 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "students": [
     {
       "id": "string",
-      "firstName": "string",
-      "lastName": "string",
+      "first_name": "string",
+      "last_name": "string",
       "email": "string",
-      "registrationStatus": "pending | approved"
+      "registration_status": "pending | approved"
     }
   ]
 }
@@ -641,9 +741,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>PATCH /lecturer/courses/:courseId/students/:studentId/approve</strong> — Approve or reject student registration</summary>
+<summary><strong>PATCH /lecturer/courses/{offering_id}/students/{student_id}/approve</strong> — Approve or reject student registration</summary>
 
-**Path Parameters:** `courseId`, `studentId`
+**Path Parameters:** `offering_id`, `student_id`
 
 **Request Body:**
 ```json
@@ -661,14 +761,17 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>POST /lecturer/courses/:courseId/materials</strong> — Upload course material</summary>
+<summary><strong>POST /lecturer/courses/{offering_id}/materials</strong> — Upload course material</summary>
 
-**Path Parameters:** `courseId`  
+**Path Parameters:** `offering_id`  
 **Body (multipart/form-data):**
 - `title`: string
 - `type`: enum (`note` | `slide` | `resource`)
 - `file`: file
 - `visibility`: enum (`students_only` | `ai_only` | `both`)
+  - `students_only`: visible to enrolled students only (cannot be AI-indexed)
+  - `ai_only`: available to the AI tutor only, not visible to students
+  - `both`: visible to students AND the AI tutor
 
 **Response:**
 ```json
@@ -678,18 +781,18 @@ For a concise route-list overview, see `ENDPOINTS.md`.
     "id": "string",
     "title": "string",
     "type": "string",
-    "fileUrl": "string",
+    "file_url": "string",
     "visibility": "string",
-    "uploadedAt": "datetime"
+    "uploaded_at": "datetime"
   }
 }
 ```
 </details>
 
 <details>
-<summary><strong>PATCH /lecturer/courses/:courseId/materials/:materialId</strong> — Update material metadata</summary>
+<summary><strong>PATCH /lecturer/courses/{offering_id}/materials/{material_id}</strong> — Update material metadata</summary>
 
-**Path Parameters:** `courseId`, `materialId`
+**Path Parameters:** `offering_id`, `material_id`
 
 **Request Body (all optional):**
 ```json
@@ -709,9 +812,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>DELETE /lecturer/courses/:courseId/materials/:materialId</strong> — Delete course material</summary>
+<summary><strong>DELETE /lecturer/courses/{offering_id}/materials/{material_id}</strong> — Delete course material</summary>
 
-**Path Parameters:** `courseId`, `materialId`
+**Path Parameters:** `offering_id`, `material_id`
 
 **Response:**
 ```json
@@ -722,9 +825,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>POST /lecturer/courses/:courseId/materials/:materialId/index</strong> — Trigger AI indexing for material</summary>
+<summary><strong>POST /lecturer/courses/{offering_id}/materials/{material_id}/index</strong> — Trigger AI indexing for material</summary>
 
-**Path Parameters:** `courseId`, `materialId`
+**Path Parameters:** `offering_id`, `material_id`
 
 **Response:**
 ```json
@@ -733,24 +836,24 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "material": {
     "id": "string",
     "indexed": true,
-    "indexedAt": "datetime"
+    "indexed_at": "datetime"
   }
 }
 ```
 </details>
 
 <details>
-<summary><strong>POST /lecturer/courses/:courseId/tasks</strong> — Create a new task</summary>
+<summary><strong>POST /lecturer/courses/{offering_id}/tasks</strong> — Create a new task</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `offering_id`
 
 **Request Body:**
 ```json
 {
   "title": "string",
   "description": "string (optional)",
-  "dueDate": "datetime",
-  "sessionId": "string (optional)",
+  "due_date": "datetime",
+  "session_id": "string (optional)",
   "questions": [
     {
       "text": "string",
@@ -769,17 +872,17 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "task": {
     "id": "string",
     "title": "string",
-    "dueDate": "datetime",
-    "questionCount": 0
+    "due_date": "datetime",
+    "question_count": 0
   }
 }
 ```
 </details>
 
 <details>
-<summary><strong>GET /lecturer/courses/:courseId/tasks</strong> — View all tasks for a course</summary>
+<summary><strong>GET /lecturer/courses/{offering_id}/tasks</strong> — View all tasks for a course</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `offering_id`
 
 **Response:**
 ```json
@@ -788,10 +891,10 @@ For a concise route-list overview, see `ENDPOINTS.md`.
     {
       "id": "string",
       "title": "string",
-      "dueDate": "datetime",
-      "questionCount": 0,
-      "totalScore": 0,
-      "aiGrading": true
+      "due_date": "datetime",
+      "question_count": 0,
+      "total_score": 0,
+      "ai_grading": true
     }
   ]
 }
@@ -799,9 +902,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /lecturer/courses/:courseId/tasks/:taskId</strong> — View full task details</summary>
+<summary><strong>GET /lecturer/courses/{offering_id}/tasks/{task_id}</strong> — View full task details</summary>
 
-**Path Parameters:** `courseId`, `taskId`
+**Path Parameters:** `offering_id`, `task_id`
 
 **Response:**
 ```json
@@ -809,10 +912,10 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "id": "string",
   "title": "string",
   "description": "string",
-  "dueDate": "datetime",
-  "totalScore": 0,
-  "aiGrading": true,
-  "markingGuideUrl": "string | null",
+  "due_date": "datetime",
+  "total_score": 0,
+  "ai_grading": true,
+  "marking_guide_url": "string | null",
   "questions": [
     {
       "id": "string",
@@ -827,17 +930,17 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>PATCH /lecturer/courses/:courseId/tasks/:taskId</strong> — Update task</summary>
+<summary><strong>PATCH /lecturer/courses/{offering_id}/tasks/{task_id}</strong> — Update task</summary>
 
-**Path Parameters:** `courseId`, `taskId`
+**Path Parameters:** `offering_id`, `task_id`
 
 **Request Body (all optional):**
 ```json
 {
   "title": "string",
   "description": "string",
-  "dueDate": "datetime",
-  "sessionId": "string | null"
+  "due_date": "datetime",
+  "session_id": "string | null"
 }
 ```
 
@@ -845,15 +948,17 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 ```json
 {
   "message": "string",
-  "task": { "id": "string", "title": "string", "dueDate": "datetime" }
+  "task": { "id": "string", "title": "string", "due_date": "datetime" }
 }
 ```
 </details>
 
 <details>
-<summary><strong>DELETE /lecturer/courses/:courseId/tasks/:taskId</strong> — Delete task</summary>
+<summary><strong>DELETE /lecturer/courses/{offering_id}/tasks/{task_id}</strong> — Delete task</summary>
 
-**Path Parameters:** `courseId`, `taskId`
+**Path Parameters:** `offering_id`, `task_id`
+
+Note: Deleting a task will also permanently delete all associated student submissions and grades.
 
 **Response:**
 ```json
@@ -864,9 +969,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>POST /lecturer/courses/:courseId/tasks/:taskId/questions</strong> — Add question to task</summary>
+<summary><strong>POST /lecturer/courses/{offering_id}/tasks/{task_id}/questions</strong> — Add question to task</summary>
 
-**Path Parameters:** `courseId`, `taskId`
+**Path Parameters:** `offering_id`, `task_id`
 
 **Request Body:**
 ```json
@@ -888,9 +993,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>PATCH /lecturer/courses/:courseId/tasks/:taskId/questions/:questionId</strong> — Update question</summary>
+<summary><strong>PATCH /lecturer/courses/{offering_id}/tasks/{task_id}/questions/{question_id}</strong> — Update question</summary>
 
-**Path Parameters:** `courseId`, `taskId`, `questionId`
+**Path Parameters:** `offering_id`, `task_id`, `question_id`
 
 **Request Body (all optional):**
 ```json
@@ -911,9 +1016,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>DELETE /lecturer/courses/:courseId/tasks/:taskId/questions/:questionId</strong> — Delete question</summary>
+<summary><strong>DELETE /lecturer/courses/{offering_id}/tasks/{task_id}/questions/{question_id}</strong> — Delete question</summary>
 
-**Path Parameters:** `courseId`, `taskId`, `questionId`
+**Path Parameters:** `offering_id`, `task_id`, `question_id`
 
 **Response:**
 ```json
@@ -924,24 +1029,24 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>POST /lecturer/courses/:courseId/tasks/:taskId/marking-guide</strong> — Upload marking guide</summary>
+<summary><strong>POST /lecturer/courses/{offering_id}/tasks/{task_id}/marking-guide</strong> — Upload marking guide</summary>
 
-**Path Parameters:** `courseId`, `taskId`  
+**Path Parameters:** `offering_id`, `task_id`  
 **Body (multipart):** `markingGuide` (file)
 
 **Response:**
 ```json
 {
   "message": "string",
-  "markingGuideUrl": "string"
+  "marking_guide_url": "string"
 }
 ```
 </details>
 
 <details>
-<summary><strong>PATCH /lecturer/courses/:courseId/tasks/:taskId/ai-grading</strong> — Enable/Disable AI grading</summary>
+<summary><strong>PATCH /lecturer/courses/{offering_id}/tasks/{task_id}/ai-grading</strong> — Enable/Disable AI grading</summary>
 
-**Path Parameters:** `courseId`, `taskId`
+**Path Parameters:** `offering_id`, `task_id`
 
 **Request Body:**
 ```json
@@ -954,15 +1059,15 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 ```json
 {
   "message": "string",
-  "aiGrading": true
+  "ai_grading": true
 }
 ```
 </details>
 
 <details>
-<summary><strong>GET /lecturer/courses/:courseId/tasks/:taskId/submissions</strong> — View submissions for a task</summary>
+<summary><strong>GET /lecturer/courses/{offering_id}/tasks/{task_id}/submissions</strong> — View submissions for a task</summary>
 
-**Path Parameters:** `courseId`, `taskId`  
+**Path Parameters:** `offering_id`, `task_id`  
 **Query (optional):** `graded` (boolean)
 
 **Response:**
@@ -972,9 +1077,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
     {
       "id": "string",
       "student": { "id": "string", "name": "string" },
-      "submittedAt": "datetime",
-      "totalScore": 0,
-      "gradingStatus": "ungraded | ai_draft | ai_approved | manually_graded"
+      "submitted_at": "datetime",
+      "total_score": 0,
+      "grading_status": "ungraded | ai_draft | ai_approved | manually_graded"
     }
   ]
 }
@@ -982,24 +1087,24 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /lecturer/courses/:courseId/tasks/:taskId/submissions/:submissionId</strong> — View specific submission</summary>
+<summary><strong>GET /lecturer/courses/{offering_id}/tasks/{task_id}/submissions/{submission_id}</strong> — View specific submission</summary>
 
-**Path Parameters:** `courseId`, `taskId`, `submissionId`
+**Path Parameters:** `offering_id`, `task_id`, `submission_id`
 
 **Response:**
 ```json
 {
   "student": { "id": "string", "name": "string", "matric_num": "string" },
-  "submittedAt": "datetime",
-  "totalScore": 0,
-  "gradingStatus": "ungraded | ai_draft | ai_approved | manually_graded",
+  "submitted_at": "datetime",
+  "total_score": 0,
+  "grading_status": "ungraded | ai_draft | ai_approved | manually_graded",
   "answers": [
     {
-      "questionId": "string",
-      "questionText": "string",
+      "question_id": "string",
+      "question_text": "string",
       "type": "string",
       "score": 0,
-      "maxScore": 0,
+      "max_score": 0,
       // fields vary by type (selectedOption, text, fileUrl, feedback, etc.)
     }
   ]
@@ -1008,16 +1113,16 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>PATCH /lecturer/courses/:courseId/tasks/:taskId/submissions/:submissionId/grade</strong> — Grade a submission</summary>
+<summary><strong>PATCH /lecturer/courses/{offering_id}/tasks/{task_id}/submissions/{submission_id}/grade</strong> — Grade a submission</summary>
 
-**Path Parameters:** `courseId`, `taskId`, `submissionId`
+**Path Parameters:** `offering_id`, `task_id`, `submission_id`
 
 **Request Body:**
 ```json
 {
   "grades": [
     {
-      "questionId": "string",
+      "question_id": "string",
       "score": 0,
       "feedback": "string (optional)"
     }
@@ -1029,20 +1134,20 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 ```json
 {
   "message": "string",
-  "submission": { "id": "string", "totalScore": 0, "gradedAt": "datetime" }
+  "submission": { "id": "string", "total_score": 0, "graded_at": "datetime" }
 }
 ```
 </details>
 
 <details>
-<summary><strong>POST /lecturer/courses/:courseId/tasks/:taskId/submissions/approve-ai-grades</strong> — Approve AI draft grades</summary>
+<summary><strong>POST /lecturer/courses/{offering_id}/tasks/{task_id}/submissions/approve-ai-grades</strong> — Approve AI draft grades</summary>
 
-**Path Parameters:** `courseId`, `taskId`
+**Path Parameters:** `offering_id`, `task_id`
 
 **Request Body (optional):**
 ```json
 {
-  "submissionIds": ["string"]
+  "submission_ids": ["string"]
 }
 ```
 
@@ -1056,15 +1161,15 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>POST /lecturer/courses/:courseId/sessions</strong> — Schedule a new class session</summary>
+<summary><strong>POST /lecturer/courses/{offering_id}/sessions</strong> — Schedule a new class session</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `offering_id`
 
 **Request Body:**
 ```json
 {
   "title": "string",
-  "scheduledAt": "datetime",
+  "scheduled_at": "datetime",
   "venue": "string (optional)",
   "notes": "string (optional)"
 }
@@ -1077,7 +1182,7 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "session": {
     "id": "string",
     "title": "string",
-    "scheduledAt": "datetime",
+    "scheduled_at": "datetime",
     "venue": "string",
     "status": "string"
   }
@@ -1086,22 +1191,22 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /lecturer/courses/:courseId/sessions</strong> — View all sessions for a course</summary>
+<summary><strong>GET /lecturer/courses/{offering_id}/sessions</strong> — View all sessions for a course</summary>
 
-**Path Parameters:** `courseId`  
+**Path Parameters:** `offering_id`  
 **Query (optional):** `status` (`upcoming` | `completed` | `cancelled`)
 
-**Response:**
+**Response:** `200 OK`
 ```json
 {
   "sessions": [
     {
       "id": "string",
       "title": "string",
-      "scheduledAt": "datetime",
+      "scheduled_at": "datetime",
       "venue": "string",
       "status": "string",
-      "attendanceCount": 0
+      "attendance_count": 0
     }
   ]
 }
@@ -1109,36 +1214,79 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /lecturer/courses/:courseId/sessions/:sessionId</strong> — View session details with attendance</summary>
+<summary><strong>GET /lecturer/courses/{offering_id}/sessions/{session_id}</strong> — View session details with attendance</summary>
 
-**Path Parameters:** `courseId`, `sessionId`
+**Path Parameters:** `offering_id`, `session_id`
 
-**Response:**
+**Response:** `200 OK`
 ```json
 {
-  "session": { "id": "string", "title": "string", "scheduledAt": "datetime", "venue": "string", "status": "string" },
-  "lecturer": { "id": "string", "firstName": "string", "lastName": "string" },
-  "isOwner": true,
+  "id": "string",
+  "offering_id": "string",
+  "lecturer_id": "string",
+  "title": "string",
+  "scheduled_at": "datetime",
+  "venue": "string",
+  "status": "upcoming | completed | cancelled",
+  "notes": "string | null",
+  "is_owner": true,
   "attendance": [
-    { "studentId": "string", "name": "string", "status": "present | absent" }
+    { "student_id": "string", "name": "string", "status": "present | absent" }
   ],
   "tasks": [
-    { "taskId": "string", "title": "string", "submissionsCount": 0 }
+    { "task_id": "string", "title": "string", "submissions_count": 0 }
   ]
 }
 ```
 </details>
 
 <details>
-<summary><strong>POST /lecturer/courses/:courseId/sessions/:sessionId/attendance</strong> — Mark attendance</summary>
+<summary><strong>PATCH /lecturer/courses/{offering_id}/sessions/{session_id}</strong> — Update session</summary>
 
-**Path Parameters:** `courseId`, `sessionId`
+**Path Parameters:** `offering_id`, `session_id`
+
+**Request Body (all optional):**
+```json
+{
+  "title": "string",
+  "scheduled_at": "datetime",
+  "venue": "string",
+  "notes": "string",
+  "status": "upcoming | completed | cancelled"
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Session updated"
+}
+```
+</details>
+
+<details>
+<summary><strong>DELETE /lecturer/courses/{offering_id}/sessions/{session_id}</strong> — Delete session</summary>
+
+**Path Parameters:** `offering_id`, `session_id`
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Session deleted"
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /lecturer/courses/{offering_id}/sessions/{session_id}/attendance</strong> — Mark attendance</summary>
+
+**Path Parameters:** `offering_id`, `session_id`
 
 **Request Body:**
 ```json
 {
   "records": [
-    { "studentId": "string", "status": "present | absent" }
+    { "student_id": "string", "status": "present | absent" }
   ]
 }
 ```
@@ -1153,19 +1301,19 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /lecturer/courses/:courseId/gradebook</strong> — View course gradebook</summary>
+<summary><strong>GET /lecturer/courses/{offering_id}/gradebook</strong> — View course gradebook</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `offering_id`
 
 **Response:**
 ```json
 {
   "students": [
     {
-      "studentId": "string",
+      "student_id": "string",
       "name": "string",
-      "tasks": [{ "taskId": "string", "title": "string", "score": 0, "maxScore": 0 }],
-      "totalScore": 0,
+      "tasks": [{ "task_id": "string", "title": "string", "score": 0, "max_score": 0 }],
+      "total_score": 0,
       "average": 0,
       "grade": "string"
     }
@@ -1175,15 +1323,15 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>PATCH /lecturer/courses/:courseId/gradebook/:studentId</strong> — Manually update student grade</summary>
+<summary><strong>PATCH /lecturer/courses/{offering_id}/gradebook/{student_id}</strong> — Manually update student grade</summary>
 
-**Path Parameters:** `courseId`, `studentId`
+**Path Parameters:** `offering_id`, `student_id`
 
 **Request Body (optional):**
 ```json
 {
   "notes": "string",
-  "manualGrade": "string"
+  "manual_grade": "string"
 }
 ```
 
@@ -1196,9 +1344,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>POST /lecturer/courses/:courseId/announcements</strong> — Post announcement</summary>
+<summary><strong>POST /lecturer/courses/{offering_id}/announcements</strong> — Post announcement</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `offering_id`
 
 **Request Body:**
 ```json
@@ -1217,16 +1365,16 @@ For a concise route-list overview, see `ENDPOINTS.md`.
     "id": "string",
     "title": "string",
     "body": "string",
-    "createdAt": "datetime"
+    "created_at": "datetime"
   }
 }
 ```
 </details>
 
 <details>
-<summary><strong>GET /lecturer/courses/:courseId/announcements</strong> — View announcements</summary>
+<summary><strong>GET /lecturer/courses/{offering_id}/announcements</strong> — View announcements</summary>
 
-**Path Parameters:** `courseId`  
+**Path Parameters:** `offering_id`  
 **Query (optional):** `pinned`, `page`, `limit`
 
 **Response:**
@@ -1238,7 +1386,7 @@ For a concise route-list overview, see `ENDPOINTS.md`.
       "title": "string",
       "body": "string",
       "pinned": true,
-      "createdAt": "datetime"
+      "created_at": "datetime"
     }
   ],
   "pagination": { "page": 0, "limit": 0, "total": 0 }
@@ -1247,27 +1395,71 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /lecturer/courses/:courseId/announcements/:announcementId</strong> — View specific announcement</summary>
+<summary><strong>GET /lecturer/courses/{offering_id}/announcements/{announcement_id}</strong> — View specific announcement</summary>
 
-**Path Parameters:** `courseId`, `announcementId`
+**Path Parameters:** `offering_id`, `announcement_id`
+
+**Response:** `200 OK`
+```json
+{
+  "id": "string",
+  "offering_id": "string",
+  "lecturer_id": "string",
+  "title": "string",
+  "body": "string",
+  "pinned": true,
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
 </details>
 
 <details>
-<summary><strong>PATCH /lecturer/courses/:courseId/announcements/:announcementId</strong> — Update announcement</summary>
+<summary><strong>PATCH /lecturer/courses/{offering_id}/announcements/{announcement_id}</strong> — Update announcement</summary>
 
-**Path Parameters:** `courseId`, `announcementId`
+**Path Parameters:** `offering_id`, `announcement_id`
+
+**Request Body (all optional):**
+```json
+{
+  "title": "string",
+  "body": "string",
+  "pinned": true
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "id": "string",
+  "offering_id": "string",
+  "lecturer_id": "string",
+  "title": "string",
+  "body": "string",
+  "pinned": true,
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
 </details>
 
 <details>
-<summary><strong>DELETE /lecturer/courses/:courseId/announcements/:announcementId</strong> — Delete announcement</summary>
+<summary><strong>DELETE /lecturer/courses/{offering_id}/announcements/{announcement_id}</strong> — Delete announcement</summary>
 
-**Path Parameters:** `courseId`, `announcementId`
+**Path Parameters:** `offering_id`, `announcement_id`
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Announcement deleted"
+}
+```
 </details>
 
 <details>
-<summary><strong>GET /lecturer/courses/:courseId/analytics</strong> — View course analytics (planned)</summary>
+<summary><strong>GET /lecturer/courses/{offering_id}/analytics</strong> — View course analytics (planned)</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `offering_id`
 </details>
 
 <details>
@@ -1275,9 +1467,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>PATCH /lecturer/courses/:courseId/ai-tutor/rules</strong> — Set or update AI tutor instructions for a course</summary>
+<summary><strong>PATCH /lecturer/courses/{offering_id}/ai-tutor/rules</strong> — Set or update AI tutor instructions for a course</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `offering_id`
 
 **Request Body:**
 ```json
@@ -1294,6 +1486,28 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 }
 ```
 </details>
+
+<details>
+<summary><strong>POST /lecturer/courses/{offering_id}/ai-tutor</strong> — Chat with AI tutor as a lecturer</summary>
+
+**Path Parameters:** `offering_id`
+
+**Request Body:**
+```json
+{
+  "message": "string",
+  "context_material_id": "string (uuid) | null",
+  "history": [{ "role": "user | assistant", "content": "string" }]
+}
+```
+
+**Response:**
+```json
+{
+  "reply": "string"
+}
+```
+</details>
 ---
 
 ## HOD
@@ -1307,7 +1521,7 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 ```json
 {
   "users": [
-    { "id": "string", "firstName": "string", "lastName": "string", "email": "string", "role": "student" }
+    { "id": "string", "first_name": "string", "last_name": "string", "email": "string", "role": "student" }
   ],
   "pagination": { "page": 0, "limit": 0, "total": 0 }
 }
@@ -1323,27 +1537,27 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /hod/students/:studentId</strong> — View specific student details</summary>
+<summary><strong>GET /hod/students/{student_id}</strong> — View specific student details</summary>
 
-**Path Parameters:** `studentId`
+**Path Parameters:** `student_id`
 
 **Response:**
 ```json
 {
   "id": "string",
-  "firstName": "string",
-  "lastName": "string",
+  "first_name": "string",
+  "last_name": "string",
   "email": "string",
   "role": "student",
   "matric_num": "string",
   "admission_session": "string",
-  "levelOffset": 0,
+  "level_offset": 0,
   "department": { "id": "string", "name": "string" },
   "offerings": [
     {
       "id": "string",
-      "courseTitle": "string",
-      "academicSession": "string",
+      "course_title": "string",
+      "academic_session": "string",
       "semester": "string",
       "status": "string"
     }
@@ -1353,16 +1567,16 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /hod/lecturers/:lecturerId</strong> — View specific lecturer details</summary>
+<summary><strong>GET /hod/lecturers/{lecturer_id}</strong> — View specific lecturer details</summary>
 
-**Path Parameters:** `lecturerId`
+**Path Parameters:** `lecturer_id`
 
 **Response:**
 ```json
 {
   "id": "string",
-  "firstName": "string",
-  "lastName": "string",
+  "first_name": "string",
+  "last_name": "string",
   "email": "string",
   "role": "lecturer",
   "staff_id": "string",
@@ -1371,10 +1585,10 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "offerings": [
     {
       "id": "string",
-      "courseTitle": "string",
-      "academicSession": "string",
+      "course_title": "string",
+      "academic_session": "string",
       "semester": "string",
-      "isActive": true
+      "is_active": true
     }
   ]
 }
@@ -1382,14 +1596,14 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>PATCH /hod/students/:studentId/level-offset</strong> — Update student's level offset</summary>
+<summary><strong>PATCH /hod/students/{student_id}/level-offset</strong> — Update student's level offset</summary>
 
-**Path Parameters:** `studentId`
+**Path Parameters:** `student_id`
 
 **Request Body:**
 ```json
 {
-  "levelOffset": 0
+  "level_offset": 0
 }
 ```
 
@@ -1399,7 +1613,7 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "message": "string",
   "student": {
     "id": "string",
-    "levelOffset": 0,
+    "level_offset": 0,
     "level": 0
   }
 }
@@ -1448,8 +1662,8 @@ For a concise route-list overview, see `ENDPOINTS.md`.
       "title": "string",
       "code": "string",
       "units": 0,
-      "totalOfferings": 0,
-      "activeOffering": true
+      "total_offerings": 0,
+      "active_offering": true
     }
   ],
   "pagination": { "page": 0, "limit": 0, "total": 0 }
@@ -1458,9 +1672,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /hod/courses/:courseId</strong> — View course definition details</summary>
+<summary><strong>GET /hod/courses/{course_id}</strong> — View course definition details</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `course_id`
 
 **Response:**
 ```json
@@ -1474,10 +1688,15 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "offerings": [
     {
       "id": "string",
-      "academicSession": "string",
+      "academic_session": "string",
       "semester": "string",
-      "isActive": true,
-      "lecturer": { "id": "string", "name": "string" }
+      "is_active": true,
+      "lecturers": [
+        {
+          "id": "string",
+          "name": "string"
+        }
+      ]
     }
   ]
 }
@@ -1485,9 +1704,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>PATCH /hod/courses/:courseId</strong> — Update course definition</summary>
+<summary><strong>PATCH /hod/courses/{course_id}</strong> — Update course definition</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `course_id`
 
 **Request Body (all optional):**
 ```json
@@ -1513,9 +1732,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>DELETE /hod/courses/:courseId</strong> — Delete course definition</summary>
+<summary><strong>DELETE /hod/courses/{course_id}</strong> — Delete course definition</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `course_id`
 
 **Response:**
 ```json
@@ -1526,15 +1745,15 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>POST /hod/courses/:courseId/offerings</strong> — Create course offering</summary>
+<summary><strong>POST /hod/courses/{course_id}/offerings</strong> — Create course offering</summary>
 
-**Path Parameters:** `courseId`
+**Path Parameters:** `course_id`
 
 **Request Body:**
 ```json
 {
-  "semesterId": "string",
-  "lecturerId": "string (optional)"
+  "semester_id": "string",
+  "lecturer_id": "string (optional)"
 }
 ```
 
@@ -1544,21 +1763,21 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "message": "string",
   "offering": {
     "id": "string",
-    "courseId": "string",
-    "academicSession": "string",
+    "course_id": "string",
+    "academic_session": "string",
     "semester": "string",
-    "isActive": true,
-    "lecturer": { "id": "string", "firstName": "string", "lastName": "string" }
+    "is_active": true,
+    "lecturers": [{ "id": "string", "first_name": "string", "last_name": "string" }]
   }
 }
 ```
 </details>
 
 <details>
-<summary><strong>GET /hod/courses/:courseId/offerings</strong> — View all offerings for a course</summary>
+<summary><strong>GET /hod/courses/{course_id}/offerings</strong> — View all offerings for a course</summary>
 
-**Path Parameters:** `courseId`  
-**Query Parameters (optional):** `semesterId`, `isActive`
+**Path Parameters:** `course_id`  
+**Query Parameters (optional):** `semester_id`, `isActive`
 
 **Response:**
 ```json
@@ -1566,11 +1785,11 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "offerings": [
     {
       "id": "string",
-      "academicSession": "string",
+      "academic_session": "string",
       "semester": "string",
-      "isActive": true,
-      "totalStudents": 0,
-      "lecturer": { "id": "string", "firstName": "string", "lastName": "string" }
+      "is_active": true,
+      "total_students": 0,
+      "lecturers": [{ "id": "string", "first_name": "string", "last_name": "string" }]
     }
   ]
 }
@@ -1578,35 +1797,35 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /hod/courses/:courseId/offerings/:offeringId</strong> — View specific offering details</summary>
+<summary><strong>GET /hod/courses/{course_id}/offerings/{offering_id}</strong> — View specific offering details</summary>
 
-**Path Parameters:** `courseId`, `offeringId`
+**Path Parameters:** `course_id`, `offering_id`
 
 **Response:**
 ```json
 {
   "id": "string",
   "course": { "id": "string", "title": "string", "code": "string" },
-  "academicSession": "string",
+  "academic_session": "string",
   "semester": "string",
-  "isActive": true,
-  "lecturer": { "id": "string", "firstName": "string", "lastName": "string", "staff_id": "string" },
-  "totalStudents": 0,
-  "totalSessions": 0,
-  "totalTasks": 0
+  "is_active": true,
+  "lecturers": [{ "id": "string", "first_name": "string", "last_name": "string", "staff_id": "string" }],
+  "total_students": 0,
+  "total_sessions": 0,
+  "total_tasks": 0
 }
 ```
 </details>
 
 <details>
-<summary><strong>PATCH /hod/courses/:courseId/offerings/:offeringId/activate</strong> — Activate/Deactivate offering</summary>
+<summary><strong>PATCH /hod/courses/{course_id}/offerings/{offering_id}/activate</strong> — Activate/Deactivate offering</summary>
 
-**Path Parameters:** `courseId`, `offeringId`
+**Path Parameters:** `course_id`, `offering_id`
 
 **Request Body:**
 ```json
 {
-  "isActive": true
+  "is_active": true
 }
 ```
 
@@ -1614,20 +1833,20 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 ```json
 {
   "message": "string",
-  "offering": { "id": "string", "isActive": true }
+  "offering": { "id": "string", "is_active": true }
 }
 ```
 </details>
 
 <details>
-<summary><strong>POST /hod/courses/:courseId/offerings/:offeringId/assign</strong> — Assign lecturer to offering</summary>
+<summary><strong>POST /hod/courses/{course_id}/offerings/{offering_id}/assign</strong> — Assign lecturer to offering</summary>
 
-**Path Parameters:** `courseId`, `offeringId`
+**Path Parameters:** `course_id`, `offering_id`
 
 **Request Body:**
 ```json
 {
-  "lecturerId": "string"
+  "lecturer_id": "string"
 }
 ```
 
@@ -1637,16 +1856,16 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "message": "string",
   "offering": {
     "id": "string",
-    "lecturer": { "id": "string", "firstName": "string", "lastName": "string" }
+    "lecturers": [{ "id": "string", "first_name": "string", "last_name": "string" }]
   }
 }
 ```
 </details>
 
 <details>
-<summary><strong>DELETE /hod/courses/:courseId/offerings/:offeringId/assign/:lecturerId</strong> — Unassign lecturer from offering</summary>
+<summary><strong>DELETE /hod/courses/{course_id}/offerings/{offering_id}/assign/{lecturer_id}</strong> — Unassign lecturer from offering</summary>
 
-**Path Parameters:** `courseId`, `offeringId`, `lecturerId`
+**Path Parameters:** `course_id`, `offering_id`, `lecturer_id`
 
 **Response:**
 ```json
@@ -1667,7 +1886,7 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 **Request Body:**
 ```json
 {
-  "userIds": ["string"]
+  "user_ids": ["string"]
 }
 ```
 
@@ -1677,7 +1896,7 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "message": "string",
   "authorized": 0,
   "failed": [
-    { "userId": "string", "reason": "string" }
+    { "user_id": "string", "reason": "string" }
   ]
 }
 ```
@@ -1718,7 +1937,7 @@ For a concise route-list overview, see `ENDPOINTS.md`.
       "id": "string",
       "name": "string",
       "code": "string",
-      "totalDepartments": 0
+      "total_departments": 0
     }
   ]
 }
@@ -1726,9 +1945,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>PATCH /admin/faculties/:facultyId</strong> — Update a faculty</summary>
+<summary><strong>PATCH /admin/faculties/{faculty_id}</strong> — Update a faculty</summary>
 
-**Path Parameters:** `facultyId`
+**Path Parameters:** `faculty_id`
 
 **Request Body (all optional):**
 ```json
@@ -1752,9 +1971,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>DELETE /admin/faculties/:facultyId</strong> — Delete a faculty</summary>
+<summary><strong>DELETE /admin/faculties/{faculty_id}</strong> — Delete a faculty</summary>
 
-**Path Parameters:** `facultyId`
+**Path Parameters:** `faculty_id`
 
 **Response:**
 ```json
@@ -1765,9 +1984,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>POST /admin/faculties/:facultyId/departments</strong> — Create a department</summary>
+<summary><strong>POST /admin/faculties/{faculty_id}/departments</strong> — Create a department</summary>
 
-**Path Parameters:** `facultyId`
+**Path Parameters:** `faculty_id`
 
 **Request Body:**
 ```json
@@ -1792,9 +2011,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /admin/faculties/:facultyId/departments</strong> — View all departments in a faculty</summary>
+<summary><strong>GET /admin/faculties/{faculty_id}/departments</strong> — View all departments in a faculty</summary>
 
-**Path Parameters:** `facultyId`
+**Path Parameters:** `faculty_id`
 
 **Response:**
 ```json
@@ -1805,7 +2024,7 @@ For a concise route-list overview, see `ENDPOINTS.md`.
       "name": "string",
       "code": "string",
       "hod": { "id": "string", "name": "string" } | null,
-      "totalCourses": 0
+      "total_courses": 0
     }
   ]
 }
@@ -1813,9 +2032,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /admin/faculties/:facultyId/departments/:departmentId</strong> — View specific department details</summary>
+<summary><strong>GET /admin/faculties/{faculty_id}/departments/{department_id}</strong> — View specific department details</summary>
 
-**Path Parameters:** `facultyId`, `departmentId`
+**Path Parameters:** `faculty_id`, `department_id`
 
 **Response:**
 ```json
@@ -1824,18 +2043,18 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "name": "string",
   "code": "string",
   "faculty": { "id": "string", "name": "string" },
-  "hod": { "id": "string", "firstName": "string", "lastName": "string" } | null,
-  "totalCourses": 0,
-  "totalStudents": 0,
-  "totalLecturers": 0
+  "hod": { "id": "string", "first_name": "string", "last_name": "string" } | null,
+  "total_courses": 0,
+  "total_students": 0,
+  "total_lecturers": 0
 }
 ```
 </details>
 
 <details>
-<summary><strong>PATCH /admin/faculties/:facultyId/departments/:departmentId</strong> — Update a department</summary>
+<summary><strong>PATCH /admin/faculties/{faculty_id}/departments/{department_id}</strong> — Update a department</summary>
 
-**Path Parameters:** `facultyId`, `departmentId`
+**Path Parameters:** `faculty_id`, `department_id`
 
 **Request Body (all optional):**
 ```json
@@ -1859,29 +2078,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>DELETE /admin/faculties/:facultyId/departments/:departmentId</strong> — Delete a department</summary>
+<summary><strong>DELETE /admin/faculties/{faculty_id}/departments/{department_id}</strong> — Delete a department</summary>
 
-**Path Parameters:** `facultyId`, `departmentId`
-
-**Response:**
-```json
-{
-  "message": "string"
-}
-```
-</details>
-
-<details>
-<summary><strong>POST /admin/departments/:departmentId/hod</strong> — Assign HOD to department</summary>
-
-**Path Parameters:** `departmentId`
-
-**Request Body:**
-```json
-{
-  "userId": "string"
-}
-```
+**Path Parameters:** `faculty_id`, `department_id`
 
 **Response:**
 ```json
@@ -1892,14 +2091,34 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>PATCH /admin/departments/:departmentId/hod</strong> — Replace current HOD</summary>
+<summary><strong>POST /admin/departments/{department_id}/hod</strong> — Assign HOD to department</summary>
 
-**Path Parameters:** `departmentId`
+**Path Parameters:** `department_id`
 
 **Request Body:**
 ```json
 {
-  "userId": "string"
+  "user_id": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "string"
+}
+```
+</details>
+
+<details>
+<summary><strong>PATCH /admin/departments/{department_id}/hod</strong> — Replace current HOD</summary>
+
+**Path Parameters:** `department_id`
+
+**Request Body:**
+```json
+{
+  "user_id": "string"
 }
 ```
 
@@ -1923,8 +2142,8 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "users": [
     {
       "id": "string",
-      "firstName": "string",
-      "lastName": "string",
+      "first_name": "string",
+      "last_name": "string",
       "email": "string",
       "role": "string",
       "department": "string"
@@ -1949,8 +2168,8 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "semesters": [
     {
       "name": "first | second",
-      "startDate": "datetime",
-      "endDate": "datetime"
+      "start_date": "datetime",
+      "end_date": "datetime"
     }
   ]
 }
@@ -1967,9 +2186,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
       {
         "id": "string",
         "name": "string",
-        "startDate": "datetime",
-        "endDate": "datetime",
-        "isActive": false
+        "start_date": "datetime",
+        "end_date": "datetime",
+        "is_active": false
       }
     ]
   }
@@ -1987,14 +2206,14 @@ For a concise route-list overview, see `ENDPOINTS.md`.
     {
       "id": "string",
       "name": "string",
-      "createdAt": "datetime",
+      "created_at": "datetime",
       "semesters": [
         {
           "id": "string",
           "name": "string",
-          "startDate": "datetime",
-          "endDate": "datetime",
-          "isActive": true
+          "start_date": "datetime",
+          "end_date": "datetime",
+          "is_active": true
         }
       ]
     }
@@ -2004,23 +2223,23 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>GET /admin/academic-sessions/:sessionId</strong> — Get single academic session</summary>
+<summary><strong>GET /admin/academic-sessions/{session_id}</strong> — Get single academic session</summary>
 
-**Path Parameters:** `sessionId`
+**Path Parameters:** `session_id`
 
 **Response:**
 ```json
 {
   "id": "string",
   "name": "string",
-  "createdAt": "datetime",
+  "created_at": "datetime",
   "semesters": [
     {
       "id": "string",
       "name": "string",
-      "startDate": "datetime",
-      "endDate": "datetime",
-      "isActive": true
+      "start_date": "datetime",
+      "end_date": "datetime",
+      "is_active": true
     }
   ]
 }
@@ -2028,9 +2247,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>PATCH /admin/academic-sessions/:sessionId</strong> — Update academic session</summary>
+<summary><strong>PATCH /admin/academic-sessions/{session_id}</strong> — Update academic session</summary>
 
-**Path Parameters:** `sessionId`
+**Path Parameters:** `session_id`
 
 **Request Body (optional):**
 ```json
@@ -2052,9 +2271,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>DELETE /admin/academic-sessions/:sessionId</strong> — Delete academic session</summary>
+<summary><strong>DELETE /admin/academic-sessions/{session_id}</strong> — Delete academic session</summary>
 
-**Path Parameters:** `sessionId`
+**Path Parameters:** `session_id`
 
 **Response:**
 ```json
@@ -2065,9 +2284,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
-<summary><strong>PATCH /admin/academic-sessions/:sessionId/semesters/:semesterId/activate</strong> — Activate a semester</summary>
+<summary><strong>PATCH /admin/academic-sessions/{session_id}/semesters/{semester_id}/activate</strong> — Activate a semester</summary>
 
-**Path Parameters:** `sessionId`, `semesterId`
+**Path Parameters:** `session_id`, `semester_id`
 
 **Response:**
 ```json
@@ -2076,22 +2295,22 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "semester": {
     "id": "string",
     "name": "string",
-    "isActive": true
+    "is_active": true
   }
 }
 ```
 </details>
 
 <details>
-<summary><strong>PATCH /admin/academic-sessions/:sessionId/semesters/:semesterId</strong> — Update a semester</summary>
+<summary><strong>PATCH /admin/academic-sessions/{session_id}/semesters/{semester_id}</strong> — Update a semester</summary>
 
-**Path Parameters:** `sessionId`, `semesterId`
+**Path Parameters:** `session_id`, `semester_id`
 
 **Request Body (all optional):**
 ```json
 {
-  "startDate": "datetime",
-  "endDate": "datetime"
+  "start_date": "datetime",
+  "end_date": "datetime"
 }
 ```
 
@@ -2101,17 +2320,17 @@ For a concise route-list overview, see `ENDPOINTS.md`.
   "message": "string",
   "semester": {
     "id": "string",
-    "startDate": "datetime",
-    "endDate": "datetime"
+    "start_date": "datetime",
+    "end_date": "datetime"
   }
 }
 ```
 </details>
 
 <details>
-<summary><strong>DELETE /admin/academic-sessions/:sessionId/semesters/:semesterId</strong> — Delete a semester</summary>
+<summary><strong>DELETE /admin/academic-sessions/{session_id}/semesters/{semester_id}</strong> — Delete a semester</summary>
 
-**Path Parameters:** `sessionId`, `semesterId`
+**Path Parameters:** `session_id`, `semester_id`
 
 **Response:**
 ```json
@@ -2126,9 +2345,9 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 ## Shared
 
 <details>
-<summary><strong>GET /materials/:materialId/download</strong> — Download material file</summary>
+<summary><strong>GET /materials/{material_id}/download</strong> — Download material file</summary>
 
-**Path Parameters:** `materialId`  
+**Path Parameters:** `material_id`  
 **Response:** Binary file stream or redirect to file URL
 </details>
 
@@ -2146,24 +2365,70 @@ For a concise route-list overview, see `ENDPOINTS.md`.
       "message": "string",
       "type": "string",
       "read": false,
-      "createdAt": "datetime",
+      "created_at": "datetime",
       "link": "string"
     }
   ],
-  "unreadCount": 0
+  "unread_count": 0
 }
 ```
 </details>
 
 <details>
-<summary><strong>PATCH /notifications/:notificationId/read</strong> — Mark notification as read</summary>
+<summary><strong>PATCH /notifications/read</strong> — Mark specific notifications as read</summary>
 
-**Path Parameters:** `notificationId`
+**Request Body:**
+```json
+{
+  "notification_ids": ["string"]
+}
+```
 
 **Response:**
 ```json
 {
-  "message": "string"
+  "marked": 0
 }
 ```
+</details>
+
+<details>
+<summary><strong>PATCH /notifications/read-all</strong> — Mark all in-app notifications as read</summary>
+
+**Response:**
+```json
+{
+  "marked": 0
+}
+```
+</details>
+
+<details>
+<summary><strong>POST /notifications/device-tokens</strong> — Register a push notification token</summary>
+
+**Request Body:**
+```json
+{
+  "token": "string",
+  "platform": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "id": "string",
+  "token": "string",
+  "platform": "string",
+  "is_active": true
+}
+```
+</details>
+
+<details>
+<summary><strong>DELETE /notifications/device-tokens/{token}</strong> — Deregister a push token</summary>
+
+**Path Parameters:** `token`
+
+**Response:** `204 No Content`
 </details>

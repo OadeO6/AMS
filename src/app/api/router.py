@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.v1 import admin, auth, health, hod, lecturer, shared, student
+from app.api.v1 import admin, auth, health, hod, lecturer, notifications, shared, student
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -29,3 +29,4 @@ api_router.include_router(admin.router)
 
 # Shared — materials download, notifications
 api_router.include_router(shared.router)
+api_router.include_router(notifications.router)

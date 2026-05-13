@@ -14,6 +14,10 @@
 - Activating a semester automatically deactivates the currently active one
 - A CourseOffering is tied to a specific semester
 - Only one active offering per course at a time — backend enforces on creation
+- An active semester cannot be deleted; a different semester must be activated first
+- A session cannot be deleted if any of its semesters are active
+- A semester cannot be deleted if `CourseOfferings` are linked to it
+- A session cannot be deleted if any of its semesters have linked offerings
 
 ---
 
@@ -115,3 +119,13 @@
 - Only Admin can create/activate academic sessions and semesters
 - Only Admin can assign or replace a HOD for a department
 - Only Admin can bulk-authorize lecturer accounts
+
+---
+
+## Course Offering Lecturers
+
+- A `CourseOffering` can have multiple lecturers via the `OfferingLecturer` junction table
+- Only users with the `lecturer` role AND `is_authorized = true` can be assigned to an offering
+- Assigning a lecturer who is already assigned returns `409 CONFLICT`
+- Removing all lecturers from an offering is allowed — the offering becomes unassigned
+- Lecturer access to an offering's routes (sessions, tasks, etc.) requires an `OfferingLecturer` row
