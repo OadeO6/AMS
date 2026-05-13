@@ -1,0 +1,21 @@
+{
+  "filename": "redis.py",
+  "category": "Basic Code Review",
+  "issues": [
+    {
+      "type": "Maintainability",
+      "severity": "Low",
+      "description": "Hardcoded configuration values for `max_connections` in the Redis connection pool (100) and `default_limits` for the rate limiter ('100/minute'). These values are often environment-dependent and should ideally be configurable via `app.config.settings` to allow for easier tuning and adaptation without code changes."
+    },
+    {
+      "type": "Code Quality",
+      "severity": "Low",
+      "description": "The comment for the `slowapi` rate limiter states: 'For simplicity in this scaffold, Limiter uses the default memory backend.' However, the code `storage_uri=settings.REDIS_URL if settings.is_production else 'memory://'` indicates that it uses Redis in production. This discrepancy can be confusing. The comment should accurately reflect that memory is used only in non-production environments for simplicity, while Redis is used in production."
+    },
+    {
+      "type": "Resource Management",
+      "severity": "Medium",
+      "description": "The Redis connection pool (`_pool`) is created globally. While `redis.asyncio` pools manage connections, it's a best practice in long-running applications (like a FastAPI service) to explicitly close the connection pool during application shutdown to ensure all resources are released gracefully. This typically involves integrating with the application's lifecycle events (e.g., FastAPI's `on_shutdown` event)."
+    }
+  ]
+}

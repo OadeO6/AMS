@@ -26,14 +26,30 @@ class SharedService:
 
     async def list_notifications(
         self, user: User, read: bool | None = None, page: int = 1, limit: int = 50
-    ) -> tuple[int, Sequence[Notification]]:
-        return await self.notification_repo.list_by_user(user.id, read, page, limit)
+    ) -> tuple[Sequence[Notification], int]:
+        return await self.notification_repo.list_for_user(
+            user.id,
+            unread_only=(read is False),
+            offset=(page - 1) * limit,
+            limit=limit,
+        )
 
-    async def mark_notification_read(self, user: User, notification_id: uuid.UUID) -> Notification:
-        notification = await self.notification_repo.get_by_id(user.id, notification_id)
-        if not notification:
-            raise NotFoundError("Notification not found")
-        return await self.notification_repo.mark_read(notification)
+    async def list_notification_response(
+        self, user: User, read: bool | None = None, page: int = 1, limit: int = 50
+    ) -> dict:
+        """Return the shared notification list response."""
+        items, total = await self.list_notifications(user, read, page, limit)
+        unread_count = await self.notification_repo.count_unread(user.id)
+        return {
+            "notifications": [NotificationResponse.model_validate(item) for item in items],
+            "unread_count": unread_count,
+            "total": total,
+            "offset": (page - 1) * limit,
+            "limit": limit,
+        }
+
+    async def mark_notification_read(self, user: User, notification_id: uuid.UUID) -> int:
+        return await self.notification_repo.mark_read([notification_id], user.id)
 
     async def get_material_download_url(self, user: User, material_id: uuid.UUID) -> str:
         """Return a URL or construct logic to download a material, enforcing access."""
@@ -46,15 +62,19 @@ class SharedService:
             raise NotFoundError("Course offering not found")
 
         # Validate access
-        if user.role == UserRole.STUDENT:
+        user_roles = {UserRole(r) for r in user.roles}
+        if UserRole.LECTURER in user_roles and any(l.lecturer_id == user.id for l in offering.lecturers):
+            # OK - access as lecturer
+            pass
+        elif UserRole.STUDENT in user_roles:
             reg = await self.registration_repo.get_by_student_and_offering(user.id, offering.id)
             if not reg or reg.status != "approved":
                 raise ForbiddenError("Not registered for this course")
             if material.visibility == "ai_only":
                 raise ForbiddenError("Material is restricted to AI use only")
-        elif user.role == UserRole.LECTURER:
-            if offering.lecturer_id != user.id:
-                raise ForbiddenError("You are not the lecturer for this course")
+        elif UserRole.LECTURER in user_roles:
+            # Not the lecturer for this specific course offering
+            raise ForbiddenError("You are not the lecturer for this course")
         else:
             raise ForbiddenError("Only students and lecturers can access materials")
 

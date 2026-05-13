@@ -36,7 +36,7 @@ class Department(Base, TimestampMixin):
     code: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
     hod_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
+        ForeignKey("users.id", ondelete="SET NULL", use_alter=True, name="departments_hod_id_fkey"),
         nullable=True,
         default=None,
         doc="The current HOD for this department.",

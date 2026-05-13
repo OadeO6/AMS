@@ -18,6 +18,12 @@ from __future__ import annotations
 from pydantic import BaseModel, EmailStr, Field
 
 
+class MessageResponse(BaseModel):
+    """Generic message response."""
+
+    message: str
+
+
 class LoginRequest(BaseModel):
     """Credentials submitted to POST /api/v1/auth/login."""
 
@@ -66,3 +72,9 @@ class ResetPasswordRequest(BaseModel):
 
     token: str
     new_password: str = Field(min_length=8, max_length=128)
+
+
+LoginResponse = TokenPair
+RegisterResponse = TokenPair
+LogoutRequest = RefreshRequest
+

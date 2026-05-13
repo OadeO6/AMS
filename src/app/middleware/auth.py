@@ -31,7 +31,8 @@ def require_role(*roles: UserRole) -> Any:
     """
 
     async def _check(user: User = Depends(get_current_user)) -> User:
-        if UserRole(user.role) not in roles:
+        user_roles = {UserRole(r) for r in user.roles}
+        if not any(role in user_roles for role in roles):
             raise ForbiddenError(
                 detail="You do not have permission to access this resource.",
                 error_code="FORBIDDEN",
@@ -54,7 +55,7 @@ def require_authorized_lecturer() -> Any:
     """
 
     async def _check(user: User = Depends(get_current_user)) -> User:
-        if UserRole(user.role) != UserRole.LECTURER:
+        if UserRole.LECTURER.value not in user.roles:
             raise ForbiddenError(
                 detail="Only lecturers can access this resource.",
                 error_code="FORBIDDEN",
@@ -62,7 +63,7 @@ def require_authorized_lecturer() -> Any:
         if not user.is_authorized:
             raise ForbiddenError(
                 detail="Your lecturer account has not been authorized by an Admin yet.",
-                error_code="LECTURER_NOT_AUTHORIZED",
+                error_code="UNAUTHORIZED_LECTURER",
             )
         return user
 

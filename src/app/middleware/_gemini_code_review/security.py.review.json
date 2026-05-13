@@ -1,0 +1,16 @@
+{
+  "filename": "security.py",
+  "category": "Basic Code Review",
+  "issues": [
+    {
+      "type": "Code Quality",
+      "severity": "Low",
+      "description": "The use of `# type: ignore` for `_rate_limit_exceeded_handler` should ideally be accompanied by a comment explaining why it's necessary. While often used for external library interfaces that might have slightly off type hints, understanding the specific reason helps maintainability and ensures no actual type mismatch is being overlooked."
+    },
+    {
+      "type": "Security Best Practice",
+      "severity": "Medium",
+      "description": "While `allow_origins` has a good comment warning against `*` in production, `allow_methods=['*']` and `allow_headers=['*']` are also very permissive. In a production environment, it's a security best practice to restrict these to only the HTTP methods and headers that your API actually needs to support. This reduces the attack surface. Consider making these configurable via `settings` as well, or adding a similar warning comment."
+    }
+  ]
+}

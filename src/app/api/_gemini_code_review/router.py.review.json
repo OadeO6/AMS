@@ -1,0 +1,11 @@
+{
+  "filename": "router.py",
+  "category": "Basic Code Review",
+  "issues": [
+    {
+      "type": "Documentation/Maintainability",
+      "severity": "Low",
+      "description": "The code is exceptionally well-structured and follows best practices for FastAPI application organization. However, for enhanced OpenAPI documentation, consider explicitly adding `tags` to the `api_router.include_router()` calls (e.g., `api_router.include_router(health.router, tags=['Health'])`). While tags can be defined within the sub-routers, providing them at this central inclusion point can offer a consistent top-level grouping in the generated API documentation, improving discoverability and organization for API consumers."
+    }
+  ]
+}

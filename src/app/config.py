@@ -89,6 +89,36 @@ class Settings(BaseSettings):
     VECTOR_DB_API_KEY: str | None = None
 
     # ------------------------------------------------------------------
+    # Notification Subsystem
+    # ------------------------------------------------------------------
+    # Email (SendGrid or SMTP)
+    SENDGRID_API_KEY: str | None = None
+
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_USE_TLS: bool = True
+    SMTP_START_TLS: bool = False
+    SMTP_FROM_EMAIL: str = "noreply@ams.example.com"
+
+    # Push (FCM)
+    FCM_PROJECT_ID: str | None = None
+    FCM_SERVER_KEY: str | None = None
+
+    # Push (Web / VAPID)
+    VAPID_PRIVATE_KEY: str | None = None
+    VAPID_CLAIMS_EMAIL: str = "admin@ams.example.com"
+
+    # SMS (Termii or Twilio)
+    TERMII_API_KEY: str | None = None
+    TERMII_SENDER_ID: str = "AMS"
+
+    TWILIO_ACCOUNT_SID: str | None = None
+    TWILIO_AUTH_TOKEN: str | None = None
+    TWILIO_FROM_NUMBER: str | None = None
+
+    # ------------------------------------------------------------------
     # Field validators
     # ------------------------------------------------------------------
 
@@ -109,6 +139,19 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return value.upper()
         raise ValueError("LOG_LEVEL must be a string")
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def _parse_debug(cls, value: object) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on", "debug"}:
+                return True
+            if normalized in {"0", "false", "no", "off", "release"}:
+                return False
+        raise ValueError("DEBUG must be a boolean-like value")
 
     # ------------------------------------------------------------------
     # Cross-field validators

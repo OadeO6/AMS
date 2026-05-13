@@ -73,3 +73,12 @@ class AnswerRepository(BaseRepository[Answer]):
             select(Answer).where(Answer.submission_id == submission_id)
         )
         return result.all()
+
+    async def get_by_submission_and_question(
+        self, submission_id: uuid.UUID, question_id: uuid.UUID
+    ) -> Answer | None:
+        return await self._session.scalar(
+            select(Answer).where(
+                and_(Answer.submission_id == submission_id, Answer.question_id == question_id)
+            )
+        )

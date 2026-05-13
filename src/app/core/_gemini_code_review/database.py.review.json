@@ -1,0 +1,11 @@
+{
+  "filename": "database.py",
+  "category": "Basic Code Review",
+  "issues": [
+    {
+      "type": "Maintainability",
+      "severity": "Low",
+      "description": "The database connection pool parameters (pool_size, max_overflow, pool_recycle) are hardcoded. While the current values are reasonable defaults, it would improve maintainability and flexibility to expose these as configurable settings (e.g., in `app.config.settings`). This allows easier tuning for different environments (development, staging, production) without modifying the core database setup code."
+    }
+  ]
+}

@@ -24,7 +24,7 @@ async def create_admin(email, password):
             hashed_password=get_password_hash(password),
             first_name="System",
             last_name="Admin",
-            role=UserRole.ADMIN,
+            roles=[UserRole.ADMIN.value],
             is_active=True,
         )
         session.add(admin)

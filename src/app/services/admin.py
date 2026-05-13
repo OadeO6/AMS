@@ -8,9 +8,10 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from app.exceptions import ConflictError, NotFoundError
+from app.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.models.user import UserRole
 from app.repositories.academic import AcademicSessionRepository, SemesterRepository
+from app.repositories.course import CourseOfferingRepository
 from app.repositories.department import DepartmentRepository
 from app.repositories.faculty import FacultyRepository
 from app.repositories.user import UserRepository
@@ -42,6 +43,7 @@ class AdminService:
         self.sessions = AcademicSessionRepository(session)
         self.semesters = SemesterRepository(session)
         self.users = UserRepository(session)
+        self.offerings = CourseOfferingRepository(session)
 
     # ---------------------------------------------------------------------------
     # Faculty
@@ -128,7 +130,7 @@ class AdminService:
         user = await self.users.get_by_id(user_id)
         if not user:
             raise NotFoundError("User not found")
-        if user.role != UserRole.HOD:
+        if UserRole.HOD.value not in user.roles:
             raise ConflictError("User must have HOD role to be assigned as Head of Department")
 
         # Set user's department explicitly as well, so their token matches the HOD scoping.
@@ -180,9 +182,25 @@ class AdminService:
         return await self.get_session(updated.id)
 
     async def delete_session(self, session_id: uuid.UUID) -> None:
-        sess = await self.sessions.get_by_id(session_id)
+        sess = await self.sessions.get_with_semesters(session_id)
         if not sess:
             raise NotFoundError("Academic session not found")
+
+        # Guard 1: cannot delete a session that has an active semester
+        if any(sem.is_active for sem in sess.semesters):
+            raise ValidationError(
+                "Cannot delete a session with an active semester."
+            )
+
+        # Guard 2: cannot delete a session if any semester has linked offerings
+        for sem in sess.semesters:
+            linked = await self.offerings.list_by_semester(sem.id)
+            if linked:
+                raise ConflictError(
+                    "Cannot delete a session with existing course offerings.",
+                    error_code="SESSION_HAS_OFFERINGS",
+                )
+
         await self.sessions.delete(sess)
 
     async def activate_semester(self, session_id: uuid.UUID, semester_id: uuid.UUID) -> Semester:
@@ -208,5 +226,19 @@ class AdminService:
         sem = await self.semesters.get_by_id(semester_id)
         if not sem or sem.academic_session_id != session_id:
             raise NotFoundError("Semester not found inside this session")
-        
+
+        # Guard 1: cannot delete an active semester
+        if sem.is_active:
+            raise ValidationError(
+                "Cannot delete an active semester. Activate another semester first."
+            )
+
+        # Guard 2: cannot delete a semester that has offerings
+        linked_offerings = await self.offerings.list_by_semester(semester_id)
+        if linked_offerings:
+            raise ConflictError(
+                "Cannot delete a semester with existing course offerings.",
+                error_code="SEMESTER_HAS_OFFERINGS",
+            )
+
         await self.semesters.delete(sem)

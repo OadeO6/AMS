@@ -1,11 +1,3 @@
-# src/app/repositories/user.py
-"""
-UserRepository — async DB access for the User model.
-
-Only DB queries live here. Business logic (e.g. password hashing,
-uniqueness error messaging) belongs in UserService / AuthService.
-"""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -37,8 +29,22 @@ class UserRepository(BaseRepository[User]):
         return result.first()
 
     async def get_by_id(self, pk: uuid.UUID) -> User | None:  # type: ignore[override]
-        """Override to narrow the ``pk`` type to ``uuid.UUID``."""
-        return await self._session.get(User, pk)
+        """Override to narrow the ``pk`` type to ``uuid.UUID`` and load relationship manually."""
+        from app.models.department import Department
+
+        stmt = (
+            select(User, Department)
+            .outerjoin(Department, User.department_id == Department.id)
+            .where(User.id == pk)
+        )
+        result = await self._session.execute(stmt)
+        row = result.first()
+        if not row:
+            return None
+
+        user, dept = row
+        user.department = dept  # Attach manually for Pydantic validation
+        return user
 
     async def exists_by_email(self, email: str) -> bool:
         """Return ``True`` if a user with this email already exists."""
@@ -52,17 +58,19 @@ class UserRepository(BaseRepository[User]):
         department_id: uuid.UUID | None = None,
         search: str | None = None,
         skip: int = 0,
-        limit: int = 100,
+        limit: int = 20,
     ) -> tuple[int, list[User]]:
-        """Return total count and a paginated list of users."""
+        """List users with filtering and pagination."""
         from sqlalchemy import func, or_
+        from app.models.department import Department
 
-        stmt = select(User)
+        stmt = select(User, Department).outerjoin(Department, User.department_id == Department.id)
         count_stmt = select(func.count()).select_from(User)
 
         if role:
-            stmt = stmt.where(User.role == role)
-            count_stmt = count_stmt.where(User.role == role)
+            # NOTE: need review
+            stmt = stmt.where(User.roles.contains([role]))
+            count_stmt = count_stmt.where(User.roles.contains([role]))
         if department_id:
             stmt = stmt.where(User.department_id == department_id)
             count_stmt = count_stmt.where(User.department_id == department_id)
@@ -78,5 +86,11 @@ class UserRepository(BaseRepository[User]):
         stmt = stmt.order_by(User.created_at.desc()).offset(skip).limit(limit)
 
         total = await self._session.scalar(count_stmt) or 0
-        result = await self._session.scalars(stmt)
-        return total, list(result.all())
+        result = await self._session.execute(stmt)
+
+        users = []
+        for user, dept in result.all():
+            user.department = dept
+            users.append(user)
+
+        return total, users

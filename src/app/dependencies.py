@@ -70,7 +70,7 @@ async def get_authorized_lecturer(
     ForbiddenError
         If the user is not a lecturer or hasn't been authorized by an Admin.
     """
-    if current_user.role != UserRole.LECTURER:
+    if UserRole.LECTURER.value not in current_user.roles:
         raise ForbiddenError("Only lecturers can access this resource", error_code="FORBIDDEN")
     if not current_user.is_authorized:
         raise ForbiddenError("Lecturer account is pending authorization", error_code="UNAUTHORIZED_LECTURER")
@@ -81,7 +81,7 @@ async def get_student(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> User:
     """Validate that the current user is a student."""
-    if current_user.role != UserRole.STUDENT:
+    if UserRole.STUDENT.value not in current_user.roles:
         raise ForbiddenError("Only students can access this resource", error_code="FORBIDDEN")
     return current_user
 

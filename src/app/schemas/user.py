@@ -19,13 +19,22 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
+
+
+
+
+
 class StudentRegister(BaseModel):
     """Payload for POST /api/v1/auth/register/student."""
+
+    model_config = ConfigDict()
 
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     first_name: str = Field(max_length=100)
     last_name: str = Field(max_length=100)
+    matric_num: str = Field(max_length=50)
+    admission_session: str = Field(max_length=20)  # e.g. "2021/2022"
     phone: str | None = Field(default=None, max_length=30)
     department_id: uuid.UUID | None = None
 
@@ -33,17 +42,21 @@ class StudentRegister(BaseModel):
 class LecturerRegister(BaseModel):
     """Payload for POST /api/v1/auth/register/lecturer."""
 
+    model_config = ConfigDict()
+
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     first_name: str = Field(max_length=100)
     last_name: str = Field(max_length=100)
-    staff_id: str | None = Field(default=None, max_length=100)
+    staff_id: str = Field(max_length=100)
     phone: str | None = Field(default=None, max_length=30)
     department_id: uuid.UUID | None = None
 
 
 class UserUpdate(BaseModel):
     """Partial profile update for PATCH /auth/me (common fields)."""
+
+    model_config = ConfigDict()
 
     first_name: str | None = Field(default=None, max_length=100)
     last_name: str | None = Field(default=None, max_length=100)
@@ -54,20 +67,41 @@ class UserUpdate(BaseModel):
 class LecturerUpdate(BaseModel):
     """Lecturer-specific profile update for PATCH /auth/me/lecturer."""
 
+    model_config = ConfigDict()
+
     staff_id: str | None = Field(default=None, max_length=100)
 
 
 class StudentUpdate(BaseModel):
     """Student-specific profile update for PATCH /auth/me/student."""
 
-    admission_year: int | None = Field(default=None, ge=1900, le=2100)
+    model_config = ConfigDict()
+
+    matric_num: str | None = Field(default=None, max_length=50)
+    admission_session: str | None = Field(default=None, max_length=20)
 
 
 class PasswordUpdate(BaseModel):
     """Payload for PATCH /auth/me/password."""
 
+    model_config = ConfigDict()
+
     current_password: str
     new_password: str = Field(min_length=8, max_length=128)
+    confirm_password: str = Field(min_length=8, max_length=128)
+
+
+class DepartmentPublic(BaseModel):
+    """Nested department object in User responses."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+
+DepartmentNested = DepartmentPublic
+
+
 
 
 class UserPublic(BaseModel):
@@ -83,13 +117,15 @@ class UserPublic(BaseModel):
     email: EmailStr
     first_name: str
     last_name: str
-    role: str
+    roles: list[str]
+    department: DepartmentPublic | None = None
     department_id: uuid.UUID | None
     phone: str | None
     avatar: str | None
     is_active: bool
-    is_authorized: bool | None
-    admission_year: int | None
+    is_authorized: bool | None = Field(default=None, alias="authorized")
+    matric_num: str | None = None
+    admission_session: str | None = None
     level_offset: int | None
     staff_id: str | None
     created_at: datetime
@@ -97,19 +133,33 @@ class UserPublic(BaseModel):
 
 
 class AuthorizeStaffRequest(BaseModel):
-    """Payload to authorize a lecturer account (Admin only)."""
+    """Payload to authorize lecturer accounts (Admin only)."""
 
-    user_id: uuid.UUID
+    model_config = ConfigDict()
+
+    user_ids: list[uuid.UUID]
+
+
+class BulkAuthorizeResponse(BaseModel):
+    """Response for bulk authorization."""
+
+    message: str
+    authorized: int
+    failed: list[dict] = []
 
 
 class LevelOffsetRequest(BaseModel):
     """Payload to update a student's level offset (HOD only)."""
+
+    model_config = ConfigDict()
 
     level_offset: int
 
 
 class UserPagination(BaseModel):
     """Metadata for paginated responses."""
+
+    model_config = ConfigDict()
 
     page: int
     limit: int
@@ -121,3 +171,60 @@ class UserListResponse(BaseModel):
 
     users: list[UserPublic]
     pagination: UserPagination
+
+
+class StudentPublicMe(BaseModel):
+    """Specific response for GET /auth/me (Student)."""
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    first_name: str
+    last_name: str
+    email: EmailStr
+    roles: list[str]
+    matric_num: str | None = None
+    admission_session: str | None = None
+    level_offset: int | None = None
+    department: DepartmentNested | None = None
+
+class LecturerPublicMe(BaseModel):
+    """Specific response for GET /auth/me (Lecturer)."""
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    first_name: str
+    last_name: str
+    email: EmailStr
+    roles: list[str]
+    staff_id: str | None = None
+    authorized: bool | None = Field(default=None, alias="is_authorized")
+    department: DepartmentNested | None = None
+
+class UpdateMeResponse(BaseModel):
+    message: str
+    user: UserPublic
+
+class UpdateStudentProfileData(BaseModel):
+    id: uuid.UUID
+    matric_num: str | None = None
+    admission_session: str | None = None
+
+class UpdateStudentProfileResponse(BaseModel):
+    message: str
+    user: UpdateStudentProfileData
+
+class UpdateLecturerProfileData(BaseModel):
+    id: uuid.UUID
+    staff_id: str | None = None
+
+class UpdateLecturerProfileResponse(BaseModel):
+    message: str
+    user: UpdateLecturerProfileData
+
+class LevelOffsetProfileData(BaseModel):
+    id: uuid.UUID
+    level_offset: int | None = None
+    level: int | None = None
+
+class LevelOffsetResponse(BaseModel):
+    message: str
+    student: LevelOffsetProfileData
+

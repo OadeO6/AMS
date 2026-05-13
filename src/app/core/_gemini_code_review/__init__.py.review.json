@@ -1,0 +1,16 @@
+{
+  "filename": "__init__.py",
+  "category": "Basic Code Review",
+  "issues": [
+    {
+      "type": "Best Practice Adherence",
+      "severity": "Low",
+      "description": "The `__init__.py` file is empty. While this is perfectly valid and often desired for simple package declarations, consider adding a docstring to explain the purpose of the `core` package, or explicitly defining `__all__` if specific modules should be exposed for import. For an empty file, this is more of a suggestion than an issue."
+    },
+    {
+      "type": "Maintainability",
+      "severity": "Info",
+      "description": "An empty `__init__.py` file is highly maintainable as there is no code to manage. This file correctly marks the `core` directory as a Python package, which is a fundamental best practice."
+    }
+  ]
+}

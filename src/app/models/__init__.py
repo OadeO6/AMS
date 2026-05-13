@@ -15,7 +15,7 @@ from app.models.department import Department
 from app.models.faculty import Faculty
 from app.models.gradebook import AITutorRule, GradebookEntry
 from app.models.material import Material
-from app.models.notification import Notification
+from app.models.notification import Notification, UserDeviceToken
 from app.models.task import Answer, Question, Submission, Task
 from app.models.user import User, UserRole
 
@@ -42,5 +42,6 @@ __all__ = [
     "Task",
     "TimestampMixin",
     "User",
+    "UserDeviceToken",
     "UserRole",
 ]

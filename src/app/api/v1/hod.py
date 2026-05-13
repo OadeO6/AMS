@@ -18,9 +18,12 @@ from app.exceptions import ForbiddenError
 from app.middleware.auth import require_role
 from app.models.user import UserRole
 from app.schemas.user import LevelOffsetRequest, UserListResponse, UserPublic
+from app.schemas.auth import MessageResponse
 from app.schemas.course import (
     CourseCreate, CourseUpdate, CourseResponse, 
-    CourseOfferingCreate, CourseOfferingResponse
+    CourseOfferingCreate, CourseOfferingResponse, CourseOfferingAssignLecturer,
+    CourseCreateResponse, CourseDefinitionListResponse, CourseDefinitionDetailResponse, CourseDefinitionListItem, CourseUpdateResponse,
+    OfferingCreateResponse, OfferingDetailResponse, OfferingActivateResponse, OfferingAssignResponse
 )
 from app.services.user import UserService
 from app.services.course import CourseService
@@ -78,7 +81,7 @@ async def get_student(
     
     svc = UserService(session)
     student = await svc.get_user_or_404(student_id)
-    if student.role != UserRole.STUDENT or student.department_id != current_user.department_id:
+    if UserRole.STUDENT.value not in student.roles or student.department_id != current_user.department_id:
         raise ForbiddenError(detail="Student not found in your department", error_code="FORBIDDEN")
     return UserPublic.model_validate(student)
 
@@ -146,7 +149,7 @@ async def get_lecturer(
     
     svc = UserService(session)
     lecturer = await svc.get_user_or_404(lecturer_id)
-    if lecturer.role != UserRole.LECTURER or lecturer.department_id != current_user.department_id:
+    if UserRole.LECTURER.value not in lecturer.roles or lecturer.department_id != current_user.department_id:
         raise ForbiddenError(detail="Lecturer not found in your department", error_code="FORBIDDEN")
     return UserPublic.model_validate(lecturer)
 
@@ -156,48 +159,51 @@ async def get_lecturer(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/courses", status_code=status.HTTP_201_CREATED)
+@router.post("/courses", response_model=CourseCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_course(
     payload: CourseCreate, session: DBSession, current_user: CurrentUser
-) -> JSONResponse:
+):
     svc = CourseService(session)
-    course = await svc.create_course(hod=current_user, payload=payload)
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
-        content={"message": "Course created successfully", "course_id": str(course.id)}
-    )
+    course_data = await svc.create_course(hod=current_user, payload=payload)
+    return CourseCreateResponse(message="Course created successfully", course=course_data)
 
 
-@router.get("/courses", response_model=list[CourseResponse], status_code=status.HTTP_200_OK)
-async def list_courses(session: DBSession, current_user: CurrentUser) -> list[CourseResponse]:
+@router.get("/courses", response_model=CourseDefinitionListResponse, status_code=status.HTTP_200_OK)
+async def list_courses(
+    session: DBSession,
+    current_user: CurrentUser,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100)
+):
     svc = CourseService(session)
-    courses = await svc.list_department_courses(hod=current_user)
-    return [CourseResponse.model_validate(c) for c in courses]
+    total, courses = await svc.list_department_courses(hod=current_user, page=page, limit=limit)
+    courses_data = [CourseDefinitionListItem(id=c.id, title=c.title, code=c.code, units=c.units) for c in courses]
+    return {
+        "courses": courses_data,
+        "pagination": {"page": page, "limit": limit, "total": total}
+    }
 
 
-@router.get("/courses/{course_id}", response_model=CourseResponse, status_code=status.HTTP_200_OK)
-async def get_course(course_id: uuid.UUID, session: DBSession, current_user: CurrentUser) -> CourseResponse:
+@router.get("/courses/{course_id}", response_model=CourseDefinitionDetailResponse, status_code=status.HTTP_200_OK)
+async def get_course(course_id: uuid.UUID, session: DBSession, current_user: CurrentUser):
     svc = CourseService(session)
-    course = await svc.get_department_course(hod=current_user, course_id=course_id)
-    return CourseResponse.model_validate(course)
+    return await svc.get_department_course_detail(hod=current_user, course_id=course_id)
 
 
-@router.patch("/courses/{course_id}", response_model=CourseResponse, status_code=status.HTTP_200_OK)
+@router.patch("/courses/{course_id}", response_model=CourseUpdateResponse, status_code=status.HTTP_200_OK)
 async def update_course(
     course_id: uuid.UUID, payload: CourseUpdate, session: DBSession, current_user: CurrentUser
-) -> CourseResponse:
+):
     svc = CourseService(session)
     course = await svc.update_course(hod=current_user, course_id=course_id, payload=payload)
-    return CourseResponse.model_validate(course)
+    return CourseUpdateResponse(message="Course updated", course=CourseResponse.model_validate(course))
 
 
-@router.delete("/courses/{course_id}", status_code=status.HTTP_200_OK)
-async def delete_course(course_id: uuid.UUID, session: DBSession, current_user: CurrentUser) -> JSONResponse:
+@router.delete("/courses/{course_id}", response_model=MessageResponse, status_code=status.HTTP_200_OK)
+async def delete_course(course_id: uuid.UUID, session: DBSession, current_user: CurrentUser):
     svc = CourseService(session)
     await svc.delete_course(hod=current_user, course_id=course_id)
-    return JSONResponse(
-        status_code=status.HTTP_200_OK, content={"message": "Course deleted successfully."}
-    )
+    return MessageResponse(message="Course deleted successfully.")
 
 
 # ---------------------------------------------------------------------------
@@ -205,16 +211,13 @@ async def delete_course(course_id: uuid.UUID, session: DBSession, current_user: 
 # ---------------------------------------------------------------------------
 
 
-@router.post("/courses/{course_id}/offerings", status_code=status.HTTP_201_CREATED)
+@router.post("/courses/{course_id}/offerings", response_model=OfferingCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_offering(
     course_id: uuid.UUID, payload: CourseOfferingCreate, session: DBSession, current_user: CurrentUser
-) -> JSONResponse:
+):
     svc = CourseService(session)
     offering = await svc.create_offering(hod=current_user, course_id=course_id, payload=payload)
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
-        content={"message": "Offering created successfully", "offering_id": str(offering.id)}
-    )
+    return OfferingCreateResponse(message="Offering created successfully", offering=CourseOfferingResponse.model_validate(offering))
 
 
 @router.get("/courses/{course_id}/offerings", response_model=list[CourseOfferingResponse], status_code=status.HTTP_200_OK)
@@ -228,45 +231,54 @@ async def list_offerings(
 
 @router.get(
     "/courses/{course_id}/offerings/{offering_id}",
-    response_model=CourseOfferingResponse,
+    response_model=OfferingDetailResponse,
     status_code=status.HTTP_200_OK,
 )
-async def get_offering(course_id: uuid.UUID, offering_id: uuid.UUID, session: DBSession, current_user: CurrentUser) -> CourseOfferingResponse:
-    svc = CourseService(session)
-    await svc.get_department_course(hod=current_user, course_id=course_id)  # Validate auth scope
-    offering = await svc.get_offering(offering_id)
-    return CourseOfferingResponse.model_validate(offering)
+async def get_offering(course_id: uuid.UUID, offering_id: uuid.UUID, session: DBSession, current_user: CurrentUser):
+    return await CourseService(session).get_offering_detail(current_user, course_id, offering_id)
 
 
 @router.patch(
     "/courses/{course_id}/offerings/{offering_id}/activate",
-    response_model=CourseOfferingResponse,
+    response_model=OfferingActivateResponse,
     status_code=status.HTTP_200_OK,
 )
-async def activate_offering(course_id: uuid.UUID, offering_id: uuid.UUID, session: DBSession, current_user: CurrentUser) -> CourseOfferingResponse:
+async def activate_offering(course_id: uuid.UUID, offering_id: uuid.UUID, session: DBSession, current_user: CurrentUser):
     svc = CourseService(session)
     offering = await svc.activate_offering(hod=current_user, course_id=course_id, offering_id=offering_id)
-    return CourseOfferingResponse.model_validate(offering)
+    return OfferingActivateResponse(message="Activated", offering=CourseOfferingResponse.model_validate(offering))
 
 
 @router.post(
     "/courses/{course_id}/offerings/{offering_id}/assign",
-    response_model=CourseOfferingResponse,
+    response_model=OfferingAssignResponse,
     status_code=status.HTTP_200_OK,
 )
-async def assign_lecturer(course_id: uuid.UUID, offering_id: uuid.UUID, lecturer_id: uuid.UUID, session: DBSession, current_user: CurrentUser) -> CourseOfferingResponse:
+async def assign_lecturer(
+    course_id: uuid.UUID,
+    offering_id: uuid.UUID,
+    payload: CourseOfferingAssignLecturer,
+    session: DBSession,
+    current_user: CurrentUser,
+):
     svc = CourseService(session)
-    offering = await svc.assign_lecturer(hod=current_user, course_id=course_id, offering_id=offering_id, lecturer_id=lecturer_id)
-    return CourseOfferingResponse.model_validate(offering)
+    offering = await svc.assign_lecturer(
+        hod=current_user,
+        course_id=course_id,
+        offering_id=offering_id,
+        lecturer_id=payload.lecturer_id,
+    )
+    return OfferingAssignResponse(message="Assigned", offering=CourseOfferingResponse.model_validate(offering))
 
 
 @router.delete(
     "/courses/{course_id}/offerings/{offering_id}/assign/{lecturer_id}",
+    response_model=MessageResponse,
     status_code=status.HTTP_200_OK,
 )
 async def unassign_lecturer(
     course_id: uuid.UUID, offering_id: uuid.UUID, lecturer_id: uuid.UUID, session: DBSession, current_user: CurrentUser
-) -> JSONResponse:
+):
     svc = CourseService(session)
     await svc.unassign_lecturer(hod=current_user, course_id=course_id, offering_id=offering_id, lecturer_id=lecturer_id)
-    return JSONResponse(status_code=status.HTTP_200_OK, content={"message": "Lecturer unassigned."})
+    return MessageResponse(message="Lecturer unassigned.")

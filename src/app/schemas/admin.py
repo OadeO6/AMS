@@ -51,7 +51,7 @@ class DepartmentUpdate(BaseModel):
 
 
 class AssignHODRequest(BaseModel):
-    hod_id: uuid.UUID
+    user_id: uuid.UUID
 
 
 class DepartmentResponse(BaseModel):
@@ -99,7 +99,7 @@ class SemesterResponse(BaseModel):
 
 class AcademicSessionCreate(BaseModel):
     name: str = Field(..., max_length=20, examples=["2024/2025"])
-    semesters: list[SemesterCreate]
+    semesters: list[SemesterCreate] = []
 
 
 class AcademicSessionUpdate(BaseModel):
@@ -113,3 +113,66 @@ class AcademicSessionResponse(BaseModel):
     name: str
     created_at: datetime
     semesters: list[SemesterResponse] = []
+
+
+class FacultyCreateResponse(BaseModel):
+    message: str
+    faculty: FacultyResponse
+
+class FacultyListResponse(BaseModel):
+    faculties: list[FacultyResponse]
+
+class DepartmentCreateResponse(BaseModel):
+    message: str
+    department: DepartmentResponse
+
+class DepartmentListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    code: str
+    hod_id: uuid.UUID | None = None
+    total_courses: int = 0
+
+class DepartmentListResponse(BaseModel):
+    departments: list[DepartmentListItem]
+
+class DepartmentDetailResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    code: str
+    faculty: dict | None = None
+    hod: dict | None = None
+    total_courses: int = 0
+    total_students: int = 0
+    total_lecturers: int = 0
+
+class DepartmentUpdateResponse(BaseModel):
+    message: str
+    department: DepartmentResponse
+
+class SessionCreateResponse(BaseModel):
+    message: str
+    session: AcademicSessionResponse
+
+class SessionListResponse(BaseModel):
+    sessions: list[AcademicSessionResponse]
+
+class SessionDetailResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    created_at: datetime
+    semesters: list[SemesterResponse] = []
+
+class SessionUpdateResponse(BaseModel):
+    message: str
+    session: AcademicSessionResponse
+
+class SemesterActivateResponse(BaseModel):
+    message: str
+    semester: SemesterResponse
+
+class SemesterUpdateResponse(BaseModel):
+    message: str
+    semester: SemesterResponse

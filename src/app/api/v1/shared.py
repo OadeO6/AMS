@@ -21,7 +21,8 @@ router = APIRouter(
 )
 
 from app.dependencies import DBSession
-from app.schemas.notification import NotificationListResponse, NotificationResponse
+from app.schemas.auth import MessageResponse
+from app.schemas.notification import NotificationListResponse
 from app.services.shared import SharedService
 
 _NOT_IMPLEMENTED = JSONResponse(
@@ -47,21 +48,10 @@ async def list_notifications(
     read: bool | None = None,
     page: int = 1,
     limit: int = 50,
-) -> NotificationListResponse:
-    svc = SharedService(session)
-    total, items = await svc.list_notifications(current_user, read, page, limit)
-    count = await svc.notification_repo.get_unread_count(current_user.id)
-    return NotificationListResponse(
-        notifications=[NotificationResponse.model_validate(n) for n in items],
-        unread_count=count,
+):
+    return NotificationListResponse.model_validate(
+        await SharedService(session).list_notification_response(current_user, read, page, limit)
     )
 
 
-@router.patch(
-    "/notifications/{notification_id}/read",
-    status_code=status.HTTP_200_OK,
-)
-async def mark_notification_read(notification_id: uuid.UUID, session: DBSession, current_user: CurrentUser) -> JSONResponse:
-    svc = SharedService(session)
-    await svc.mark_notification_read(current_user, notification_id)
-    return JSONResponse(status_code=status.HTTP_200_OK, content={"message": "Notification marked as read"})
+

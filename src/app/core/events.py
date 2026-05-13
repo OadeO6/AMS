@@ -12,6 +12,7 @@ import structlog
 
 from app.core.database import engine
 from app.core.redis import redis_pool
+from app.core.arq_pool import init_arq_pool, close_arq_pool
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -39,6 +40,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # Note: Do NOT raise here. Let the `/readyz` probe handle exposing
         # bad state so kubernetes knows it's unready, rather than crashing loop.
 
+    # Initialize ARQ pool
+    await init_arq_pool()
+    logger.info("ARQ pool initialized")
+
     # 2. Yield control back to FastAPI to serve requests
     yield
 
@@ -47,4 +52,5 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     await redis_pool.close()
     await engine.dispose()
+    await close_arq_pool()
     logger.info("Teardown complete")

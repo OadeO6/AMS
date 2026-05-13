@@ -52,14 +52,26 @@ class UserService:
             raise ConflictError(detail="Email already registered", error_code="EMAIL_CONFLICT")
 
         hashed_password = get_password_hash(payload.password)
+        
+        # Derive admission_year from admission_session (e.g. "2021/2022" -> 2021)
+        admission_year = None
+        if payload.admission_session:
+            try:
+                admission_year = int(payload.admission_session.split("/")[0])
+            except (ValueError, IndexError):
+                pass
+
         return await self.repo.create(
             email=email,
             hashed_password=hashed_password,
             first_name=payload.first_name,
             last_name=payload.last_name,
-            role=UserRole.STUDENT,
+            roles=[UserRole.STUDENT.value],
             phone=payload.phone,
             department_id=payload.department_id,
+            matric_num=payload.matric_num,
+            admission_session=payload.admission_session,
+            admission_year=admission_year,
             is_active=True,
         )
 
@@ -81,7 +93,7 @@ class UserService:
             hashed_password=hashed_password,
             first_name=payload.first_name,
             last_name=payload.last_name,
-            role=UserRole.LECTURER,
+            roles=[UserRole.LECTURER.value],
             phone=payload.phone,
             staff_id=payload.staff_id,
             department_id=payload.department_id,
@@ -131,7 +143,7 @@ class UserService:
             If the user is not a lecturer.
         """
         user = await self.get_user_or_404(user_id)
-        if user.role != UserRole.LECTURER:
+        if UserRole.LECTURER.value not in user.roles:
             raise ForbiddenError(
                 detail="Only lecturers can update lecturer profile fields",
                 error_code="FORBIDDEN",
@@ -150,7 +162,7 @@ class UserService:
             If the user is not a student.
         """
         user = await self.get_user_or_404(user_id)
-        if user.role != UserRole.STUDENT:
+        if UserRole.STUDENT.value not in user.roles:
             raise ForbiddenError(
                 detail="Only students can update student profile fields",
                 error_code="FORBIDDEN",
@@ -202,15 +214,27 @@ class UserService:
     async def authorize_lecturer(self, user_id: uuid.UUID) -> User:
         """Authorize a lecturer account."""
         user = await self.get_user_or_404(user_id)
-        if user.role != UserRole.LECTURER:
+        if UserRole.LECTURER.value not in user.roles:
             raise ConflictError(detail="Only lecturers can be authorized", error_code="NOT_A_LECTURER")
         if user.is_authorized:
             raise ConflictError(detail="Lecturer is already authorized", error_code="ALREADY_AUTHORIZED")
         return await self.repo.update(user, is_authorized=True)
 
+    async def authorize_lecturers(self, user_ids: list[uuid.UUID]) -> tuple[int, list[dict]]:
+        """Bulk authorize lecturer accounts."""
+        authorized_count = 0
+        failed = []
+        for uid in user_ids:
+            try:
+                await self.authorize_lecturer(uid)
+                authorized_count += 1
+            except Exception as e:
+                failed.append({"user_id": str(uid), "reason": str(e)})
+        return authorized_count, failed
+
     async def update_level_offset(self, student_id: uuid.UUID, offset: int) -> User:
         """Update a student's level offset."""
         user = await self.get_user_or_404(student_id)
-        if user.role != UserRole.STUDENT:
+        if UserRole.STUDENT.value not in user.roles:
             raise ConflictError(detail="User is not a student", error_code="NOT_A_STUDENT")
         return await self.repo.update(user, level_offset=offset)

@@ -10,9 +10,10 @@ from pydantic import BaseModel, ConfigDict
 
 
 class MaterialType(StrEnum):
+    note = "note"
+    slide = "slide"
+    resource = "resource"
     document = "document"
-    video = "video"
-    link = "link"
 
 
 class MaterialVisibility(StrEnum):
@@ -46,3 +47,18 @@ class MaterialResponse(BaseModel):
     indexed: bool
     indexed_at: datetime | None
     created_at: datetime
+
+class MaterialUploadResponse(BaseModel):
+    message: str
+    material: MaterialResponse
+
+class MaterialUpdateResponse(BaseModel):
+    message: str
+    material: MaterialResponse
+
+class MaterialIndexResponse(BaseModel):
+    message: str
+    material: MaterialResponse
+
+class StudentMaterialListResponse(BaseModel):
+    materials: list[MaterialResponse]

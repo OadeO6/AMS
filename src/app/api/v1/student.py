@@ -12,14 +12,21 @@ from fastapi.responses import JSONResponse
 
 from app.dependencies import AuthorizedStudent, DBSession
 from app.middleware.active_semester import require_active_semester
-from app.schemas.announcement import AnnouncementResponse
-from app.schemas.course import CourseOfferingResponse, CourseResponse
-from app.schemas.material import MaterialResponse
-from app.schemas.session import AttendanceResponse, ClassSessionResponse
-from app.schemas.student import StudentAnnouncementResponse, StudentGradeSummary, StudentTaskDetailResponse, SubmitTaskRequest
-from app.schemas.task import SubmissionResponse, TaskResponse
+from app.schemas.announcement import StudentAnnouncementListResponse, StudentAnnouncementItem
+from app.schemas.course import CourseListResponse, CourseDetailResponse, CourseRegisterResponse, StudentCourseListResponse
+from app.schemas.auth import MessageResponse
+from app.schemas.material import MaterialResponse, StudentMaterialListResponse
+from app.schemas.session import SessionListResponse
+from app.schemas.student import (
+    StudentAttendanceResponse,
+    StudentTaskDetailResponse,
+    SubmitTaskRequest,
+)
+from app.schemas.task import StudentGradeListResponse
+from app.schemas.task import StudentTaskListResponse, SubmitTaskResponse
 from app.schemas.analytics import StudentGlobalAnalytics, StudentCourseAnalytics
 from app.schemas.ai_tutor import AITutorRequest, AITutorResponse
+from app.services.course import CourseService
 from app.services.student import StudentService
 from app.services.analytics import AnalyticsService
 from app.services.ai_tutor import AITutorService
@@ -40,49 +47,72 @@ _NOT_IMPLEMENTED = JSONResponse(
 # Student Registration & Browsing (From Phase 4)
 # ---------------------------------------------------------------------------
 
-from app.services.course import CourseService
+@router.get("/courses", response_model=CourseListResponse)
+async def list_available_courses(
+    current_user: AuthorizedStudent,
+    session: DBSession,
+    department: str | None = Query(None),
+    level: int | None = Query(None, ge=0),
+    search: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+):
+    svc = StudentService(session)
+    return await svc.list_available_courses(
+        current_user,
+        department=department,
+        level=level,
+        search=search,
+        page=page,
+        limit=limit,
+    )
 
-@router.get("/courses", response_model=list[CourseOfferingResponse])
-async def list_available_courses(session: DBSession):
-    svc = CourseService(session)
-    return await svc.list_available_offerings()
+@router.get("/courses/{offering_id}", response_model=CourseDetailResponse)
+async def get_course_offering(offering_id: uuid.UUID, current_user: AuthorizedStudent, session: DBSession):
+    return await StudentService(session).get_course_offering_detail(current_user, offering_id)
 
-@router.get("/courses/{offering_id}", response_model=CourseOfferingResponse)
-async def get_course_offering(offering_id: uuid.UUID, session: DBSession):
-    svc = CourseService(session)
-    return await svc.get_offering(offering_id)
-
-@router.post("/courses/{offering_id}/register", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_active_semester)])
+@router.post("/courses/{offering_id}/register", response_model=CourseRegisterResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_active_semester)])
 async def register_for_course(offering_id: uuid.UUID, current_user: AuthorizedStudent, session: DBSession):
     svc = CourseService(session)
     reg = await svc.register_student(current_user, offering_id)
-    return {"message": "Success", "status": reg.status}
+    return CourseRegisterResponse(message="Success", status=reg.status)
 
-@router.delete("/courses/{offering_id}/register", status_code=status.HTTP_200_OK, dependencies=[Depends(require_active_semester)])
+@router.delete("/courses/{offering_id}/register", response_model=MessageResponse, status_code=status.HTTP_200_OK, dependencies=[Depends(require_active_semester)])
 async def drop_course(offering_id: uuid.UUID, current_user: AuthorizedStudent, session: DBSession):
     svc = CourseService(session)
     await svc.unregister_student(current_user, offering_id)
     return {"message": "Dropped"}
 
-@router.get("/student/courses", response_model=list[CourseOfferingResponse])
-async def get_registered_courses(current_user: AuthorizedStudent, session: DBSession):
-    svc = CourseService(session)
-    return await svc.list_student_offerings(current_user)
+@router.get("/student/courses", response_model=StudentCourseListResponse)
+async def get_registered_courses(
+    current_user: AuthorizedStudent,
+    session: DBSession,
+    status: str | None = Query(None, pattern="^(pending|approved)$"),
+    semester_id: uuid.UUID | None = Query(None),
+):
+    return await StudentService(session).list_registered_courses(
+        current_user,
+        semester_id=semester_id,
+        status=status,
+    )
 
 # ---------------------------------------------------------------------------
 # Materials
 # ---------------------------------------------------------------------------
 
 
-@router.get("/student/courses/{course_id}/materials", response_model=list[MaterialResponse])
+@router.get("/student/courses/{offering_id}/materials", response_model=StudentMaterialListResponse)
 async def list_materials(
-    course_id: uuid.UUID,
+    offering_id: uuid.UUID,
     current_user: AuthorizedStudent,
     session: DBSession,
     type: str | None = Query(None),
 ):
+    # TODO: Service layer map
     svc = StudentService(session)
-    return await svc.list_materials(current_user, course_id, type_=type)
+    # Materials are already filtered by visibility in service
+    materials = await svc.list_materials(current_user, offering_id, type_=type)
+    return {"materials": [MaterialResponse.model_validate(m) for m in materials]}
 
 
 # ---------------------------------------------------------------------------
@@ -90,36 +120,34 @@ async def list_materials(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/student/courses/{course_id}/tasks", response_model=list[TaskResponse])
+@router.get("/student/courses/{offering_id}/tasks", response_model=StudentTaskListResponse)
 async def list_tasks(
-    course_id: uuid.UUID,
+    offering_id: uuid.UUID,
     current_user: AuthorizedStudent,
     session: DBSession,
     status: str | None = Query(None),
 ):
-    svc = StudentService(session)
-    return await svc.list_tasks(current_user, course_id, status)
+    return await StudentService(session).list_task_summaries(current_user, offering_id, status)
 
 
-@router.get("/student/courses/{course_id}/tasks/{task_id}", response_model=StudentTaskDetailResponse)
+@router.get("/student/courses/{offering_id}/tasks/{task_id}", response_model=StudentTaskDetailResponse)
 async def get_task(
-    course_id: uuid.UUID,
+    offering_id: uuid.UUID,
     task_id: uuid.UUID,
     current_user: AuthorizedStudent,
     session: DBSession,
 ):
-    svc = StudentService(session)
-    return await svc.get_task(current_user, course_id, task_id)
+    return await StudentService(session).get_task_detail_response(current_user, offering_id, task_id)
 
 
 @router.post(
-    "/student/courses/{course_id}/tasks/{task_id}/submit",
-    response_model=dict,
+    "/student/courses/{offering_id}/tasks/{task_id}/submit",
+    response_model=SubmitTaskResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_active_semester)],
 )
 async def submit_task(
-    course_id: uuid.UUID,
+    offering_id: uuid.UUID,
     task_id: uuid.UUID,
     payload: SubmitTaskRequest,
     current_user: AuthorizedStudent,
@@ -128,8 +156,9 @@ async def submit_task(
     svc = StudentService(session)
     # Answers data must be dicts
     answers_data = [ans.model_dump() for ans in payload.answers]
-    sub = await svc.submit_task(current_user, course_id, task_id, answers_data)
-    return {"message": "Success", "submission": {"id": str(sub.id)}}
+    sub = await svc.submit_task(current_user, offering_id, task_id, answers_data)
+    from app.schemas.task import SubmissionResponse
+    return SubmitTaskResponse(message="Success", submission=SubmissionResponse.model_validate(sub))
 
 
 # ---------------------------------------------------------------------------
@@ -137,12 +166,11 @@ async def submit_task(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/student/courses/{course_id}/grades", response_model=StudentGradeSummary)
+@router.get("/student/courses/{offering_id}/grades", response_model=StudentGradeListResponse)
 async def get_grades(
-    course_id: uuid.UUID, current_user: AuthorizedStudent, session: DBSession
+    offering_id: uuid.UUID, current_user: AuthorizedStudent, session: DBSession
 ):
-    svc = StudentService(session)
-    return await svc.get_grades(current_user, course_id)
+    return await StudentService(session).get_grade_response(current_user, offering_id)
 
 
 # ---------------------------------------------------------------------------
@@ -150,43 +178,45 @@ async def get_grades(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/student/courses/{course_id}/announcements", response_model=list[StudentAnnouncementResponse])
+@router.get("/student/courses/{offering_id}/announcements", response_model=StudentAnnouncementListResponse)
 async def list_announcements(
-    course_id: uuid.UUID,
+    offering_id: uuid.UUID,
     current_user: AuthorizedStudent,
     session: DBSession,
+    viewed: bool | None = Query(None),
     pinned: bool | None = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
 ):
-    svc = StudentService(session)
-    anns = await svc.list_announcements(current_user, course_id, pinned_only=pinned or False)
-    results = []
-    for ann in anns:
-        data = StudentAnnouncementResponse.model_validate(ann)
-        results.append(data)
-    return results
+    return await StudentService(session).list_announcements(
+        current_user,
+        offering_id,
+        viewed=viewed,
+        pinned_only=bool(pinned),
+        page=page,
+        limit=limit,
+    )
 
 
-@router.get("/student/courses/{course_id}/announcements/{announcement_id}", response_model=StudentAnnouncementResponse)
+@router.get("/student/courses/{offering_id}/announcements/{announcement_id}", response_model=StudentAnnouncementItem)
 async def get_announcement(
-    course_id: uuid.UUID,
+    offering_id: uuid.UUID,
     announcement_id: uuid.UUID,
     current_user: AuthorizedStudent,
     session: DBSession,
 ):
-    svc = StudentService(session)
-    ann = await svc.get_announcement(current_user, course_id, announcement_id)
-    return StudentAnnouncementResponse.model_validate(ann)
+    return await StudentService(session).get_announcement_response(current_user, offering_id, announcement_id)
 
 
-@router.patch("/student/courses/{course_id}/announcements/{announcement_id}/viewed", status_code=status.HTTP_204_NO_CONTENT)
+@router.patch("/student/courses/{offering_id}/announcements/{announcement_id}/viewed", status_code=status.HTTP_204_NO_CONTENT)
 async def mark_announcement_viewed(
-    course_id: uuid.UUID,
+    offering_id: uuid.UUID,
     announcement_id: uuid.UUID,
     current_user: AuthorizedStudent,
     session: DBSession,
 ):
     svc = StudentService(session)
-    await svc.mark_announcement_viewed(current_user, course_id, announcement_id)
+    await svc.mark_announcement_viewed(current_user, offering_id, announcement_id)
 
 
 # ---------------------------------------------------------------------------
@@ -194,30 +224,24 @@ async def mark_announcement_viewed(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/student/courses/{course_id}/sessions", response_model=list[ClassSessionResponse])
+@router.get("/student/courses/{offering_id}/sessions", response_model=SessionListResponse)
 async def list_sessions(
-    course_id: uuid.UUID,
+    offering_id: uuid.UUID,
     current_user: AuthorizedStudent,
     session: DBSession,
     status: str | None = Query(None),
 ):
-    svc = StudentService(session)
-    return await svc.list_sessions(current_user, course_id, status)
+    return await StudentService(session).list_session_response(current_user, offering_id, status)
 
 
-@router.get("/student/courses/{course_id}/sessions/{session_id}")
+@router.get("/student/courses/{offering_id}/sessions/{session_id}")
 async def get_session(
-    course_id: uuid.UUID,
+    offering_id: uuid.UUID,
     session_id: uuid.UUID,
     current_user: AuthorizedStudent,
     session: DBSession,
 ):
-    svc = StudentService(session)
-    data = await svc.get_session(current_user, course_id, session_id)
-    return {
-        "session": dict(ClassSessionResponse.model_validate(data["session"])),
-        "attendance": dict(AttendanceResponse.model_validate(data["attendance"])) if data["attendance"] else None
-    }
+    return await StudentService(session).get_session_response(current_user, offering_id, session_id)
 
 
 # ---------------------------------------------------------------------------
@@ -225,12 +249,12 @@ async def get_session(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/student/courses/{course_id}/attendance", response_model=list[AttendanceResponse])
+@router.get("/student/courses/{offering_id}/attendance", response_model=StudentAttendanceResponse)
 async def get_attendance(
-    course_id: uuid.UUID, current_user: AuthorizedStudent, session: DBSession
+    offering_id: uuid.UUID, current_user: AuthorizedStudent, session: DBSession
 ):
     svc = StudentService(session)
-    return await svc.get_attendance(current_user, course_id)
+    return await svc.get_attendance(current_user, offering_id)
 
 
 # ---------------------------------------------------------------------------
@@ -249,28 +273,28 @@ async def get_analytics(current_user: AuthorizedStudent, session: DBSession):
 
 
 @router.get(
-    "/student/courses/{course_id}/analytics",
+    "/student/courses/{offering_id}/analytics",
     response_model=StudentCourseAnalytics,
     status_code=status.HTTP_200_OK,
 )
 async def get_course_analytics(
-    course_id: uuid.UUID, current_user: AuthorizedStudent, session: DBSession
+    offering_id: uuid.UUID, current_user: AuthorizedStudent, session: DBSession
 ):
     svc = AnalyticsService(session)
-    return await svc.get_student_course_metrics(current_user.id, course_id)
+    return await svc.get_student_course_metrics(current_user.id, offering_id)
 
 
 @router.post(
-    "/student/courses/{course_id}/ai-tutor",
+    "/student/courses/{offering_id}/ai-tutor",
     response_model=AITutorResponse,
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(require_active_semester)],
 )
 async def ai_tutor_chat(
-    course_id: uuid.UUID,
+    offering_id: uuid.UUID,
     payload: AITutorRequest,
     current_user: AuthorizedStudent,
     session: DBSession,
 ):
     svc = AITutorService(session)
-    return await svc.chat(current_user.id, course_id, payload)
+    return await svc.chat(current_user.id, offering_id, payload)

@@ -2,7 +2,7 @@
 """
 User ORM model — AMS domain version.
 
-A User is an authenticated principal with one of four roles:
+A User is an authenticated principal with one or more roles:
   student | lecturer | hod | admin
 
 Passwords are NEVER stored in plain text — only the bcrypt hash goes here.
@@ -13,9 +13,14 @@ from __future__ import annotations
 import uuid
 from enum import StrEnum
 
-from sqlalchemy import Boolean, Integer, String
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, ForeignKey, Integer, String
+from sqlalchemy.dialects.postgresql import UUID, ARRAY
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.notification import Notification, UserDeviceToken
 
 from app.models.base import Base, TimestampMixin
 
@@ -39,7 +44,7 @@ class User(Base, TimestampMixin):
     hashed_password Bcrypt hash (cost 12). Never returned in responses.
     first_name      Given name.
     last_name       Family name.
-    role            One of: student | lecturer | hod | admin.
+    roles           List of roles: student | lecturer | hod | admin.
     department_id   FK → Department (nullable; FK constraint added in Phase 3).
     phone           Optional contact number.
     avatar          Optional URL to profile image.
@@ -86,17 +91,18 @@ class User(Base, TimestampMixin):
         nullable=False,
         doc="User's family name.",
     )
-    role: Mapped[str] = mapped_column(
-        String(20),
+    roles: Mapped[list[str]] = mapped_column(
+        ARRAY(String(20)),
         nullable=False,
-        doc="One of: student | lecturer | hod | admin.",
+        server_default="{}",
+        doc="List of roles assigned to the user. Possible values: student | lecturer | hod | admin.",
     )
-    # FK to Department — stored as UUID; FK constraint added in Phase 3 migration
     department_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
+        ForeignKey("departments.id", ondelete="SET NULL"),
         nullable=True,
         default=None,
-        doc="Department the user belongs to (FK enforced in Phase 3).",
+        doc="Department the user belongs to.",
     )
     phone: Mapped[str | None] = mapped_column(
         String(30),
@@ -121,11 +127,24 @@ class User(Base, TimestampMixin):
     # ------------------------------------------------------------------
     # Student-only fields
     # ------------------------------------------------------------------
+    matric_num: Mapped[str | None] = mapped_column(
+        String(50),
+        unique=True,
+        nullable=True,
+        index=True,
+        doc="Unique student matriculation number. Student role only.",
+    )
     admission_year: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
         default=None,
         doc="Year of first admission (e.g. 2021). Student role only.",
+    )
+    admission_session: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        default=None,
+        doc="Admitted session string (e.g. '2021/2022'). Student role only.",
     )
     level_offset: Mapped[int | None] = mapped_column(
         Integer,
@@ -151,7 +170,21 @@ class User(Base, TimestampMixin):
         doc="Set to True by Admin before lecturer can access protected routes.",
     )
 
+    # --- Relationships (Notification Subsystem) ---------------------------
+    notifications: Mapped[list[Notification]] = relationship(
+        "Notification",
+        back_populates="user",
+        lazy="noload",
+        cascade="all, delete-orphan",
+    )
+    device_tokens: Mapped[list[UserDeviceToken]] = relationship(
+        "UserDeviceToken",
+        back_populates="user",
+        lazy="noload",
+        cascade="all, delete-orphan",
+    )
+
     def __repr__(self) -> str:
         return (
-            f"<User id={self.id!s} email={self.email!r} role={self.role} active={self.is_active}>"
+            f"<User id={self.id!s} email={self.email!r} roles={self.roles} active={self.is_active}>"
         )

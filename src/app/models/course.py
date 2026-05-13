@@ -4,6 +4,7 @@ Course, CourseOffering, and CourseRegistration ORM models.
 
 Course:             The canonical course definition (belongs to a Department).
 CourseOffering:     An instance of a Course for a specific Semester.
+OfferingLecturer:   Junction table — many lecturers per offering.
 CourseRegistration: A student's enrolment in a CourseOffering.
 """
 
@@ -13,7 +14,7 @@ import uuid
 
 from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 
@@ -44,7 +45,10 @@ class Course(Base, TimestampMixin):
 
 
 class CourseOffering(Base):
-    """A course scheduled for a specific semester, optionally assigned to a lecturer."""
+    """A course scheduled for a specific semester.
+
+    Lecturers are managed via the OfferingLecturer junction table.
+    """
 
     __tablename__ = "course_offerings"
 
@@ -65,12 +69,6 @@ class CourseOffering(Base):
         nullable=False,
         index=True,
     )
-    lecturer_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True,
-        default=None,
-    )
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
@@ -78,8 +76,58 @@ class CourseOffering(Base):
         server_default="true",
     )
 
+    # Relationships
+    course: Mapped[Course] = relationship("Course", lazy="select")
+    semester: Mapped[Semester] = relationship("Semester", lazy="select")
+
+    # Many-to-many: lecturers assigned to this offering
+    lecturers: Mapped[list[OfferingLecturer]] = relationship(
+        "OfferingLecturer",
+        back_populates="offering",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+    )
+
     def __repr__(self) -> str:
         return f"<CourseOffering id={self.id!s} course={self.course_id!s}>"
+
+
+class OfferingLecturer(Base, TimestampMixin):
+    """Junction table: many lecturers — many offerings.
+
+    Each row represents one lecturer's assignment to one offering.
+    """
+
+    __tablename__ = "offering_lecturers"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    offering_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("course_offerings.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    lecturer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # Back-reference to the offering
+    offering: Mapped[CourseOffering] = relationship(
+        "CourseOffering", back_populates="lecturers"
+    )
+
+    # Reference to the user record
+    lecturer: Mapped[User] = relationship("User", lazy="selectin")
+
+    def __repr__(self) -> str:
+        return f"<OfferingLecturer offering={self.offering_id!s} lecturer={self.lecturer_id!s}>"
 
 
 class CourseRegistration(Base, TimestampMixin):
@@ -114,6 +162,11 @@ class CourseRegistration(Base, TimestampMixin):
         server_default="pending",
         doc="pending | approved | rejected",
     )
+
+    # Relationships
+    student: Mapped[User] = relationship("User", lazy="selectin")
+    offering: Mapped[CourseOffering] = relationship("CourseOffering", lazy="selectin")
+
 
     def __repr__(self) -> str:
         return f"<CourseRegistration id={self.id!s} status={self.status!r}>"

@@ -31,7 +31,9 @@ from app.schemas.auth import (
     LoginRequest,
     RefreshRequest,
     ResetPasswordRequest,
+    ResetPasswordRequest,
     TokenPair,
+    MessageResponse,
 )
 from app.schemas.user import (
     LecturerRegister,
@@ -41,6 +43,9 @@ from app.schemas.user import (
     StudentUpdate,
     UserPublic,
     UserUpdate,
+    UpdateMeResponse,
+    UpdateStudentProfileResponse,
+    UpdateLecturerProfileResponse,
 )
 from app.services.auth import AuthService
 from app.services.user import UserService
@@ -61,6 +66,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 )
 async def register_student(payload: StudentRegister, session: DBSession) -> TokenPair:
     """Create a new student account and return a token pair."""
+    # TODO: Spec originally returned MessageResponse. TokenPair kept for PR feedback.
     _, tokens = await AuthService(session).register_student(payload)
     return tokens
 
@@ -77,6 +83,7 @@ async def register_lecturer(payload: LecturerRegister, session: DBSession) -> To
     The account is created with is_authorized=False.
     The lecturer cannot access protected routes until an Admin authorizes them.
     """
+    # TODO: Spec originally returned MessageResponse. TokenPair kept for PR feedback.
     _, tokens = await AuthService(session).register_lecturer(payload)
     return tokens
 
@@ -162,12 +169,13 @@ async def reset_password(payload: ResetPasswordRequest, session: DBSession) -> J
 )
 async def get_me(current_user: CurrentUser) -> UserPublic:
     """Return the profile of the currently authenticated user."""
+    # TODO: Spec specifies StudentPublicMe / LecturerPublicMe. Keeping UserPublic for now.
     return UserPublic.model_validate(current_user)
 
 
 @router.patch(
     "/me",
-    response_model=UserPublic,
+    response_model=UpdateMeResponse,
     summary="Update my profile (common fields)",
     status_code=status.HTTP_200_OK,
 )
@@ -175,16 +183,19 @@ async def update_me(
     payload: UserUpdate,
     current_user: CurrentUser,
     session: DBSession,
-) -> UserPublic:
+) -> UpdateMeResponse:
     """Partially update first_name, last_name, phone, or avatar."""
     svc = UserService(session)
     updated = await svc.update_profile(current_user.id, payload)
-    return UserPublic.model_validate(updated)
+    return UpdateMeResponse(
+        message="Profile updated",
+        user=UserPublic.model_validate(updated)
+    )
 
 
 @router.patch(
     "/me/student",
-    response_model=UserPublic,
+    response_model=UpdateStudentProfileResponse,
     summary="Update student-specific profile fields",
     status_code=status.HTTP_200_OK,
 )
@@ -192,16 +203,19 @@ async def update_me_student(
     payload: StudentUpdate,
     current_user: CurrentUser,
     session: DBSession,
-) -> UserPublic:
+) -> UpdateStudentProfileResponse:
     """Student-specific profile patch (admission_year)."""
     svc = UserService(session)
     updated = await svc.update_student_profile(current_user.id, payload)
-    return UserPublic.model_validate(updated)
+    return UpdateStudentProfileResponse(
+        message="Profile updated successfully.",
+        user={"id": updated.id, "matric_num": updated.matric_num, "admission_session": updated.admission_session}
+    )
 
 
 @router.patch(
     "/me/lecturer",
-    response_model=UserPublic,
+    response_model=UpdateLecturerProfileResponse,
     summary="Update lecturer-specific profile fields",
     status_code=status.HTTP_200_OK,
 )
@@ -209,15 +223,19 @@ async def update_me_lecturer(
     payload: LecturerUpdate,
     current_user: CurrentUser,
     session: DBSession,
-) -> UserPublic:
+) -> UpdateLecturerProfileResponse:
     """Partially update lecturer-specific fields (staff_id)."""
     svc = UserService(session)
     updated = await svc.update_lecturer_profile(current_user.id, payload)
-    return UserPublic.model_validate(updated)
+    return UpdateLecturerProfileResponse(
+        message="Profile updated successfully.",
+        user={"id": updated.id, "staff_id": updated.staff_id}
+    )
 
 
 @router.patch(
     "/me/password",
+    response_model=MessageResponse,
     summary="Change my password",
     status_code=status.HTTP_200_OK,
 )
@@ -231,5 +249,5 @@ async def change_password(
     await svc.change_password(current_user.id, payload)
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"detail": "Password updated."},
+        content={"message": "Password updated."},
     )
