@@ -10,9 +10,25 @@ async def test_shared_notifications(async_client: AsyncClient, get_auth_headers,
     
     # Create dummy notifications
     from app.repositories.notification import NotificationRepository
+    from app.models.notification import NotificationChannel
     repo = NotificationRepository(db_session)
-    n1 = await repo.create(student_user.id, "Hello", "info", None)
-    n2 = await repo.create(student_user.id, "Important", "alert", "http://example.com")
+    # New schema: user_id, event, channel, title, body, data
+    n1 = await repo.create(
+        user_id=student_user.id,
+        event="test.info",
+        channel=NotificationChannel.INAPP,
+        title="Hello",
+        body="This is a test notification",
+        data={"link": None}
+    )
+    n2 = await repo.create(
+        user_id=student_user.id,
+        event="test.alert",
+        channel=NotificationChannel.INAPP,
+        title="Important",
+        body="This is an important notification",
+        data={"link": "http://example.com"}
+    )
     await db_session.commit()
 
     # List notifications
@@ -23,14 +39,19 @@ async def test_shared_notifications(async_client: AsyncClient, get_auth_headers,
     assert data["unread_count"] == 2
 
     # Mark read
-    patch_resp = await async_client.patch(f"/api/v1/notifications/{n1.id}/read", headers=student_headers)
+    patch_resp = await async_client.patch(
+        "/api/v1/notifications/read",
+        json={"notification_ids": [str(n1.id)]},
+        headers=student_headers,
+    )
     assert patch_resp.status_code == 200
 
     # List unread
     resp2 = await async_client.get("/api/v1/notifications?read=false", headers=student_headers)
     assert resp2.status_code == 200
-    assert len(resp2.json()["notifications"]) == 1
-    assert resp2.json()["unread_count"] == 1
+    data2 = resp2.json()
+    assert len(data2["notifications"]) == 1
+    assert data2["unread_count"] == 1
 
 
 @pytest.mark.asyncio

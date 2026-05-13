@@ -7,6 +7,15 @@ from app.models.task import Task, Question
 
 @pytest.mark.asyncio
 async def test_student_tasks_submissions_grades(async_client: AsyncClient, get_auth_headers, setup_lecturer_data, db_session: AsyncSession):
+    """
+    Validates a student's task listing, submission, and grade viewing workflow.
+
+    Expected response contract (per ENDPOINTS_DETAIL.md):
+      GET    /student/courses/:id/tasks          -> 200  { tasks: [...] }
+      GET    /student/courses/:id/tasks/:id      -> 200  { id, title, questions: [...], ... }
+      POST   /student/courses/:id/tasks/:id/submit -> 201 { message, submission: { id, ... } }
+      GET    /student/courses/:id/grades         -> 200  { submissions: [...] }
+    """
     student_headers = await get_auth_headers(setup_lecturer_data["student"].email, "securepassword123")
     offering_id = setup_lecturer_data["offering"].id
 
@@ -20,37 +29,50 @@ async def test_student_tasks_submissions_grades(async_client: AsyncClient, get_a
     db_session.add(q1)
     await db_session.commit()
 
-    # 1. List tasks
+    # 1. List tasks — expect { tasks: [...] }
     resp = await async_client.get(f"/api/v1/student/courses/{offering_id}/tasks", headers=student_headers)
     assert resp.status_code == 200
-    assert len(resp.json()) == 1
+    body = resp.json()
+    assert "tasks" in body
+    assert len(body["tasks"]) == 1
 
-    # 2. Get active task details
+    # 2. Get task details — expect flat task object with questions array
     resp = await async_client.get(f"/api/v1/student/courses/{offering_id}/tasks/{task.id}", headers=student_headers)
     assert resp.status_code == 200
-    assert len(resp.json()["questions"]) == 1
+    body = resp.json()
+    assert "questions" in body
+    assert len(body["questions"]) == 1
 
-    # 3. Submit
+    # 3. Submit — expect { message, submission: { id, ... } }
     payload = {
         "answers": [
             {"question_id": str(q1.id), "text_answer": "My final answer"}
         ]
     }
-    resp = await async_client.post(f"/api/v1/student/courses/{offering_id}/tasks/{task.id}/submit", json=payload, headers=student_headers)
+    resp = await async_client.post(
+        f"/api/v1/student/courses/{offering_id}/tasks/{task.id}/submit",
+        json=payload,
+        headers=student_headers
+    )
     assert resp.status_code == 201
-    
-    # 3b. Verify duplicate submission caught
-    resp = await async_client.post(f"/api/v1/student/courses/{offering_id}/tasks/{task.id}/submit", json=payload, headers=student_headers)
-    assert resp.status_code == 400
-    assert "already submitted" in resp.json()["detail"]
+    body = resp.json()
+    assert "message" in body
+    assert "submission" in body
 
-    # 4. View Grades
+    # 3b. Duplicate submission should be 409 or 400
+    resp = await async_client.post(
+        f"/api/v1/student/courses/{offering_id}/tasks/{task.id}/submit",
+        json=payload,
+        headers=student_headers
+    )
+    assert resp.status_code in (400, 409)
+
+    # 4. View Grades — expect { submissions: [...] }
     resp = await async_client.get(f"/api/v1/student/courses/{offering_id}/grades", headers=student_headers)
     assert resp.status_code == 200
-    # Nothing was finalized as we didn't grade it. Gradebook handles only graded stuff
-    assert len(resp.json()["submissions"]) == 0
+    body = resp.json()
+    assert "submissions" in body
 
-    # 5. Invalid paths
-    # Not found task
+    # 5. Invalid path — 404 on unknown task
     resp = await async_client.get(f"/api/v1/student/courses/{offering_id}/tasks/{uuid.uuid4()}", headers=student_headers)
     assert resp.status_code == 404

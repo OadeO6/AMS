@@ -11,9 +11,9 @@ async def test_admin_faculty_crud(async_client: AsyncClient, admin_headers: dict
     response = await async_client.post("/api/v1/admin/faculties", json=payload, headers=admin_headers)
     assert response.status_code == 201
     data = response.json()
-    assert data["name"] == "Faculty of Engineering"
-    assert data["code"] == "ENG"
-    faculty_id = data["id"]
+    assert data["faculty"]["name"] == "Faculty of Engineering"
+    assert data["faculty"]["code"] == "ENG"
+    faculty_id = data["faculty"]["id"]
 
     # 2. Duplicate Faculty (Conflict)
     response2 = await async_client.post("/api/v1/admin/faculties", json=payload, headers=admin_headers)
@@ -22,7 +22,7 @@ async def test_admin_faculty_crud(async_client: AsyncClient, admin_headers: dict
     # 3. List Faculties
     response3 = await async_client.get("/api/v1/admin/faculties", headers=admin_headers)
     assert response3.status_code == 200
-    assert len(response3.json()) >= 1
+    assert len(response3.json()["faculties"]) >= 1
 
     # 4. Update Faculty
     response4 = await async_client.patch(
@@ -35,14 +35,14 @@ async def test_admin_faculty_crud(async_client: AsyncClient, admin_headers: dict
 
     # 5. Delete Faculty
     response5 = await async_client.delete(f"/api/v1/admin/faculties/{faculty_id}", headers=admin_headers)
-    assert response5.status_code == 204
+    assert response5.status_code == 200
 
 @pytest.mark.asyncio
 async def test_admin_department_crud(async_client: AsyncClient, admin_headers: dict[str, str], hod_user: User) -> None:
     # 1. Create a Faculty first
     payload = {"name": "Faculty of Science", "code": "SCI"}
     fac_res = await async_client.post("/api/v1/admin/faculties", json=payload, headers=admin_headers)
-    faculty_id = fac_res.json()["id"]
+    faculty_id = fac_res.json()["faculty"]["id"]
 
     # 2. Create Department
     dept_payload = {"name": "Computer Science", "code": "CSC"}
@@ -53,9 +53,9 @@ async def test_admin_department_crud(async_client: AsyncClient, admin_headers: d
     )
     assert response.status_code == 201
     data = response.json()
-    assert data["name"] == "Computer Science"
-    assert data["code"] == "CSC"
-    department_id = data["id"]
+    assert data["department"]["name"] == "Computer Science"
+    assert data["department"]["code"] == "CSC"
+    department_id = data["department"]["id"]
     
     # 3. Duplicate Department
     response_dup = await async_client.post(
@@ -66,14 +66,14 @@ async def test_admin_department_crud(async_client: AsyncClient, admin_headers: d
     assert response_dup.status_code == 409
 
     # 4. Assign HOD
-    assign_payload = {"hod_id": str(hod_user.id)}
+    assign_payload = {"user_id": str(hod_user.id)}
     assign_response = await async_client.post(
         f"/api/v1/admin/departments/{department_id}/hod",
         json=assign_payload,
         headers=admin_headers
     )
     assert assign_response.status_code == 200
-    assert assign_response.json()["hod_id"] == str(hod_user.id)
+    assert assign_response.json()["message"] == "HOD assigned successfully"
     
     # 5. List Departments
     list_response = await async_client.get(
@@ -81,7 +81,7 @@ async def test_admin_department_crud(async_client: AsyncClient, admin_headers: d
         headers=admin_headers
     )
     assert list_response.status_code == 200
-    assert len(list_response.json()) >= 1
+    assert len(list_response.json()["departments"]) >= 1
 
 @pytest.mark.asyncio
 async def test_admin_service_misc_exceptions(async_client: AsyncClient, admin_headers: dict[str, str]) -> None:
@@ -137,7 +137,7 @@ async def test_admin_department_not_found_and_conflict(async_client: AsyncClient
     # 3. Assign HOD but user not found
     res3 = await async_client.post(
         f"/api/v1/admin/departments/{fake_id}/hod",
-        json={"hod_id": fake_id},
+        json={"user_id": fake_id},
         headers=admin_headers
     )
     assert res3.status_code == 404

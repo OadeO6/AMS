@@ -11,15 +11,18 @@ async def test_student_profile_update(async_client: AsyncClient, get_auth_header
     # Try updating admission year
     resp = await async_client.patch(
         "/api/v1/auth/me/student",
-        json={"admission_year": 2025},
+        json={"admission_session": "2025/2026"},
         headers=student_headers
     )
     assert resp.status_code == 200
-    assert resp.json()["admission_year"] == 2025
+    body = resp.json()
+    # spec: { message, user: { admission_session, ... } } (UpdateStudentProfileResponse)
+    user_data = body.get("user", body)
+    assert user_data.get("admission_session") == "2025/2026"
 
     # Check that it persisted
     await db_session.refresh(student_user)
-    assert student_user.admission_year == 2025
+    assert student_user.admission_session == "2025/2026"
 
 @pytest.mark.asyncio
 async def test_lecturer_update_student_profile_forbidden(async_client: AsyncClient, get_auth_headers, setup_lecturer_data):
@@ -29,7 +32,7 @@ async def test_lecturer_update_student_profile_forbidden(async_client: AsyncClie
     # Lecturer cannot update student profile
     resp = await async_client.patch(
         "/api/v1/auth/me/student",
-        json={"admission_year": 2025},
+        json={"admission_session": "2025/2026"},
         headers=lecturer_headers
     )
     assert resp.status_code == 403

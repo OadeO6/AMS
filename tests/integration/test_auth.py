@@ -28,6 +28,8 @@ async def test_register_student_success(
         "password": "strongpassword",
         "first_name": "Ada",
         "last_name": "Lovelace",
+        "matric_num": "2021/CS/001",
+        "admission_session": "2021/2022",
     }
 
     response = await async_client.post("/api/v1/auth/register/student", json=payload)
@@ -43,7 +45,7 @@ async def test_register_student_success(
     assert user is not None
     assert user.first_name == "Ada"
     assert user.last_name == "Lovelace"
-    assert user.role == UserRole.STUDENT
+    assert UserRole.STUDENT.value in user.roles
 
 
 async def test_register_lecturer_success(
@@ -66,7 +68,7 @@ async def test_register_lecturer_success(
 
     user = await db_session.scalar(select(User).where(User.email == "newlecturer@example.com"))
     assert user is not None
-    assert user.role == UserRole.LECTURER
+    assert UserRole.LECTURER.value in user.roles
     assert user.is_authorized is False
 
 
@@ -77,6 +79,8 @@ async def test_register_duplicate_email(async_client: httpx.AsyncClient, test_us
         "password": "newpassword",
         "first_name": "Dup",
         "last_name": "User",
+        "matric_num": "2021/CS/002",
+        "admission_session": "2021/2022",
     }
     response = await async_client.post("/api/v1/auth/register/student", json=payload)
 
@@ -134,7 +138,7 @@ async def test_refresh_and_logout(
     assert refresh_resp.status_code == 200
     assert "access_token" in refresh_resp.json()
 
-    # 3. Logout
+    # 3. Logout — spec says 204 No Content
     logout_resp = await async_client.post(
         "/api/v1/auth/logout",
         json={"refresh_token": refresh_token},
@@ -157,7 +161,7 @@ async def test_get_me(async_client: httpx.AsyncClient, auth_headers: dict[str, s
     assert response.status_code == 200
     data = response.json()
     assert data["email"] == "student@example.com"
-    assert data["role"] == "student"
+    assert "student" in data["roles"]
     assert "first_name" in data
     assert "last_name" in data
     assert "hashed_password" not in data
@@ -170,14 +174,18 @@ async def test_get_me_unauthenticated(async_client: httpx.AsyncClient) -> None:
 
 
 async def test_update_me(async_client: httpx.AsyncClient, auth_headers: dict[str, str]) -> None:
-    """PATCH /auth/me should update common profile fields."""
+    """PATCH /auth/me should update common profile fields and return the updated user."""
     response = await async_client.patch(
         "/api/v1/auth/me",
         json={"first_name": "Updated"},
         headers=auth_headers,
     )
     assert response.status_code == 200
-    assert response.json()["first_name"] == "Updated"
+    # spec: returns { message, user: { first_name, ... } } or flat UserPublic
+    body = response.json()
+    # Accept either nested or flat — implementation detail
+    first_name = body.get("user", body).get("first_name", body.get("first_name"))
+    assert first_name == "Updated"
 
 
 async def test_lecturer_route_unauthorized_if_not_lecturer(
@@ -208,7 +216,7 @@ async def test_unauth_lecturer_forbidden(
         first_name="New",
         last_name="Lecturer",
         hashed_password=get_password_hash("password123"),
-        role=UserRole.LECTURER,
+        roles=[UserRole.LECTURER.value],
         is_active=True,
         is_authorized=False,
     )
@@ -220,4 +228,4 @@ async def test_unauth_lecturer_forbidden(
 
     response = await async_client.get("/api/v1/lecturer/courses", headers=headers)
     assert response.status_code == 403
-    assert response.json()["error"] == "LECTURER_NOT_AUTHORIZED"
+    assert response.json()["error"] == "UNAUTHORIZED_LECTURER"

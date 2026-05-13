@@ -10,7 +10,7 @@ async def test_lecturer_gradebook(async_client: AsyncClient, get_auth_headers, s
     # Get initial gradebook (empty)
     resp = await async_client.get(f"/api/v1/lecturer/courses/{offering_id}/gradebook", headers=headers)
     assert resp.status_code == 200
-    assert len(resp.json()) == 0
+    assert len(resp.json()["students"]) == 0
     
     # Create entry via patch
     resp = await async_client.patch(
@@ -22,7 +22,7 @@ async def test_lecturer_gradebook(async_client: AsyncClient, get_auth_headers, s
     
     # Verify in list
     resp = await async_client.get(f"/api/v1/lecturer/courses/{offering_id}/gradebook", headers=headers)
-    entries = resp.json()
+    entries = resp.json()["students"]
     assert len(entries) == 1
     assert entries[0]["manual_grade"] == "A"
     assert entries[0]["notes"] == "Great work"

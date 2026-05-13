@@ -14,6 +14,11 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 from unittest import mock
+from unittest.mock import MagicMock
+import sys
+
+# Mock boto3 to avoid ModuleNotFoundError in environments where it's not installed
+sys.modules["boto3"] = MagicMock()
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -60,13 +65,18 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 async def setup_test_db() -> AsyncGenerator[None, None]:
     """Create the test database schema once per session."""
     async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        from sqlalchemy import text
+        # Robustly clean the database by dropping the entire public schema
+        await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+        await conn.execute(text("CREATE SCHEMA public"))
         await conn.run_sync(Base.metadata.create_all)
 
     yield
 
     async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        from sqlalchemy import text
+        await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+        await conn.execute(text("CREATE SCHEMA public"))
     await test_engine.dispose()
 
 
@@ -118,8 +128,11 @@ async def async_client(
 
     Overrides the database and redis dependencies with test equivalents.
     """
-    # Override get_db_session
+    # Override get_db_session and get_arq_pool
+    from app.core.arq_pool import get_arq_pool
+    
     app.dependency_overrides[get_db_session] = lambda: db_session
+    app.dependency_overrides[get_arq_pool] = lambda: mock.AsyncMock()
 
     # Monkey-patch the global redis_pool used by health check and token repository
     with (
@@ -144,8 +157,11 @@ async def student_user(db_session: AsyncSession) -> User:
         first_name="Test",
         last_name="Student",
         hashed_password=get_password_hash("securepassword123"),
-        role=UserRole.STUDENT,
+        roles=[UserRole.STUDENT.value],
         is_active=True,
+        admission_year=2024,
+        admission_session="2024/2025",
+        level_offset=0,
     )
     db_session.add(user)
     await db_session.commit()
@@ -167,7 +183,7 @@ async def lecturer_user(db_session: AsyncSession) -> User:
         first_name="Test",
         last_name="Lecturer",
         hashed_password=get_password_hash("securepassword123"),
-        role=UserRole.LECTURER,
+        roles=[UserRole.LECTURER.value],
         is_active=True,
         is_authorized=True,
     )
@@ -212,9 +228,15 @@ async def setup_lecturer_data(db_session: AsyncSession, lecturer_user: User, stu
     db_session.add(course)
     await db_session.flush()
     
-    # Assign lecturer to offering
-    offering = CourseOffering(course_id=course.id, semester_id=semester.id, is_active=True, lecturer_id=lecturer_user.id)
+    # Assign lecturer to offering via junction table
+    offering = CourseOffering(course_id=course.id, semester_id=semester.id, is_active=True)
     db_session.add(offering)
+    await db_session.flush()
+
+    # Insert OfferingLecturer row (junction table)
+    from app.models.course import OfferingLecturer
+    offering_lecturer = OfferingLecturer(offering_id=offering.id, lecturer_id=lecturer_user.id)
+    db_session.add(offering_lecturer)
     await db_session.flush()
 
     # Register student
@@ -247,7 +269,7 @@ async def admin_user(db_session: AsyncSession) -> User:
         first_name="Admin",
         last_name="User",
         hashed_password=get_password_hash("securepassword123"),
-        role=UserRole.ADMIN,
+        roles=[UserRole.ADMIN.value],
         is_active=True,
     )
     db_session.add(user)
@@ -270,7 +292,7 @@ async def hod_user(db_session: AsyncSession) -> User:
         first_name="HOD",
         last_name="User",
         hashed_password=get_password_hash("securepassword123"),
-        role=UserRole.HOD,
+        roles=[UserRole.HOD.value, UserRole.LECTURER.value],
         is_active=True,
     )
     db_session.add(user)
@@ -293,7 +315,7 @@ async def inactive_user(db_session: AsyncSession) -> User:
         first_name="Inactive",
         last_name="User",
         hashed_password=get_password_hash("securepassword123"),
-        role=UserRole.STUDENT,
+        roles=[UserRole.STUDENT.value],
         is_active=False,
     )
     db_session.add(user)
@@ -310,7 +332,7 @@ async def test_user(db_session: AsyncSession) -> User:
         first_name="Inactive",
         last_name="User",
         hashed_password=get_password_hash("securepassword123"),
-        role=UserRole.STUDENT,
+        roles=[UserRole.STUDENT.value],
         is_active=False,
     )
     db_session.add(user)

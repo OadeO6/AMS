@@ -42,7 +42,7 @@ async def test_admin_authorize_staff(
         first_name="Unauth",
         last_name="Lecturer",
         hashed_password=get_password_hash("password123"),
-        role=UserRole.LECTURER,
+        roles=[UserRole.LECTURER.value],
         is_active=True,
         is_authorized=False,
     )
@@ -65,7 +65,7 @@ async def test_admin_authorize_staff(
     # 3. Admin authorizes them
     auth_resp = await async_client.post(
         "/api/v1/admin/staff/authorize",
-        json={"user_id": str(unauth_lecturer.id)},
+        json={"user_ids": [str(unauth_lecturer.id)]},
         headers=admin_headers
     )
     assert auth_resp.status_code == 200

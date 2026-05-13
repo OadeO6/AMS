@@ -48,7 +48,7 @@ async def test_create_student_success(service: UserService, repo_mock: AsyncMock
         first_name="Ada",
         last_name="Lovelace",
         hashed_password="fakehash",
-        role=UserRole.STUDENT,
+        roles=[UserRole.STUDENT.value],
         is_active=True,
     )
     repo_mock.create.return_value = stub_user
@@ -58,6 +58,8 @@ async def test_create_student_success(service: UserService, repo_mock: AsyncMock
         password="password123",
         first_name="Ada",
         last_name="Lovelace",
+        matric_num="2021/CS/001",
+        admission_session="2021/2022",
     )
 
     with patch("app.services.user.get_password_hash", return_value="fakehash") as mock_hash:
@@ -69,13 +71,16 @@ async def test_create_student_success(service: UserService, repo_mock: AsyncMock
             hashed_password="fakehash",
             first_name="Ada",
             last_name="Lovelace",
-            role=UserRole.STUDENT,
+            roles=[UserRole.STUDENT.value],
             phone=None,
             department_id=None,
             is_active=True,
+            matric_num="2021/CS/001",
+            admission_session="2021/2022",
+            admission_year=2021,
         )
         assert result.email == "student@example.com"
-        assert result.role == UserRole.STUDENT
+        assert UserRole.STUDENT.value in result.roles
 
 
 async def test_create_student_email_conflict(service: UserService, repo_mock: AsyncMock) -> None:
@@ -87,6 +92,8 @@ async def test_create_student_email_conflict(service: UserService, repo_mock: As
         password="password123",
         first_name="Ada",
         last_name="Lovelace",
+        matric_num="2021/CS/002",
+        admission_session="2021/2022",
     )
 
     with pytest.raises(ConflictError) as exc:
@@ -102,7 +109,7 @@ async def test_create_student_email_conflict(service: UserService, repo_mock: As
 
 
 async def test_create_lecturer_success(service: UserService, repo_mock: AsyncMock) -> None:
-    """Creating a lecturer should set role=LECTURER and is_authorized=False."""
+    """Creating a lecturer should set roles=[LECTURER] and is_authorized=False."""
     repo_mock.exists_by_email.return_value = False
 
     stub_user = User(
@@ -111,7 +118,7 @@ async def test_create_lecturer_success(service: UserService, repo_mock: AsyncMoc
         first_name="Grace",
         last_name="Hopper",
         hashed_password="fakehash",
-        role=UserRole.LECTURER,
+        roles=[UserRole.LECTURER.value],
         is_active=True,
         is_authorized=False,
     )
@@ -130,7 +137,7 @@ async def test_create_lecturer_success(service: UserService, repo_mock: AsyncMoc
     with patch("app.services.user.get_password_hash", return_value="fakehash"):
         result = await service.create_lecturer(payload)
 
-    assert result.role == UserRole.LECTURER
+    assert UserRole.LECTURER.value in result.roles
     assert result.is_authorized is False
 
 
@@ -160,14 +167,14 @@ async def test_update_profile_success(service: UserService, repo_mock: AsyncMock
         email="test@example.com",
         first_name="Old",
         last_name="Name",
-        role=UserRole.STUDENT,
+        roles=[UserRole.STUDENT.value],
     )
     updated_user = User(
         id=user_id,
         email="test@example.com",
         first_name="New",
         last_name="Name",
-        role=UserRole.STUDENT,
+        roles=[UserRole.STUDENT.value],
     )
     repo_mock.get_by_id.return_value = stub_user
     repo_mock.update.return_value = updated_user
@@ -194,7 +201,7 @@ async def test_update_lecturer_profile_forbidden_for_student(
         email="student@example.com",
         first_name="Test",
         last_name="Student",
-        role=UserRole.STUDENT,
+        roles=[UserRole.STUDENT.value],
     )
     repo_mock.get_by_id.return_value = stub_user
 
@@ -220,11 +227,15 @@ async def test_change_password_wrong_current(service: UserService, repo_mock: As
         first_name="T",
         last_name="U",
         hashed_password="correcthash",
-        role=UserRole.STUDENT,
+        roles=[UserRole.STUDENT.value],
     )
     repo_mock.get_by_id.return_value = stub_user
 
-    payload = PasswordUpdate(current_password="wrongpass", new_password="newpass123")
+    payload = PasswordUpdate(
+        current_password="wrongpass", 
+        new_password="newpass123",
+        confirm_password="newpass123"
+    )
 
     with (
         patch("app.services.user.verify_password", return_value=False),

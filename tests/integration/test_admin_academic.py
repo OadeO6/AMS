@@ -12,14 +12,13 @@ async def test_admin_academic_session_crud(async_client: AsyncClient, admin_head
         ]
     }
     
-    # 1. Create Session
     response = await async_client.post("/api/v1/admin/academic-sessions", json=session_payload, headers=admin_headers)
     assert response.status_code == 201
     data = response.json()
-    session_id = data["id"]
-    assert len(data["semesters"]) == 2
-    first_sem_id = next(s["id"] for s in data["semesters"] if s["name"] == "first")
-    second_sem_id = next(s["id"] for s in data["semesters"] if s["name"] == "second")
+    session_id = data["session"]["id"]
+    assert len(data["session"]["semesters"]) == 2
+    first_sem_id = next(s["id"] for s in data["session"]["semesters"] if s["name"] == "first")
+    second_sem_id = next(s["id"] for s in data["session"]["semesters"] if s["name"] == "second")
     
     # duplicate check
     dup_res = await async_client.post("/api/v1/admin/academic-sessions", json=session_payload, headers=admin_headers)
@@ -31,11 +30,13 @@ async def test_admin_academic_session_crud(async_client: AsyncClient, admin_head
         headers=admin_headers
     )
     assert activate_res1.status_code == 200
-    assert activate_res1.json()["is_active"] == True
+    assert activate_res1.json()["semester"]["is_active"] == True
     
     # Verify the first semester is the active one in the session get
     get_res = await async_client.get(f"/api/v1/admin/academic-sessions/{session_id}", headers=admin_headers)
-    sems = get_res.json()["semesters"]
+    # Admin get_session returns SessionDetailResponse (or the session directly)
+    sess_data = get_res.json().get("session", get_res.json())
+    sems = sess_data["semesters"]
     first = next(s for s in sems if s["id"] == first_sem_id)
     second = next(s for s in sems if s["id"] == second_sem_id)
     assert first["is_active"] == True
@@ -50,7 +51,8 @@ async def test_admin_academic_session_crud(async_client: AsyncClient, admin_head
     
     # Verify first got deactivated
     get_res2 = await async_client.get(f"/api/v1/admin/academic-sessions/{session_id}", headers=admin_headers)
-    sems2 = get_res2.json()["semesters"]
+    sess_data2 = get_res2.json().get("session", get_res2.json())
+    sems2 = sess_data2["semesters"]
     first2 = next(s for s in sems2 if s["id"] == first_sem_id)
     second2 = next(s for s in sems2 if s["id"] == second_sem_id)
     assert first2["is_active"] == False

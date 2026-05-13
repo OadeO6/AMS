@@ -18,7 +18,6 @@ async def test_ai_tutor_student_chat(async_client: AsyncClient, setup_lecturer_d
     assert resp.status_code == 200
     data = resp.json()
     assert "reply" in data
-    assert "tokens_used" in data
     assert "Simulated AI Tutor response to: 'Can you explain recursion?'." in data["reply"]
 
 

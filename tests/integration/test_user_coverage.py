@@ -12,13 +12,15 @@ async def test_admin_authorize_lecturer_coverage(
     admin_headers: dict[str, str],
     db_session: AsyncSession
 ) -> None:
-    # 1. Authorize non-lecturer (student)
+    # 1. Authorize non-lecturer (student) — should fail gracefully
     student_payload = {
         "email": "student_auth_test@test.com",
         "password": "password123",
         "first_name": "Auth",
         "last_name": "Test",
-        "phone": "12345678"
+        "phone": "12345678",
+        "matric_num": "STUD001",
+        "admission_session": "2024/2025"
     }
     reg_res = await async_client.post("/api/v1/auth/register/student", json=student_payload)
     assert reg_res.status_code == 201
@@ -29,13 +31,16 @@ async def test_admin_authorize_lecturer_coverage(
     
     res_auth = await async_client.post(
         "/api/v1/admin/staff/authorize", 
-        json={"user_id": str(student_id)}, 
+        json={"user_ids": [str(student_id)]}, 
         headers=admin_headers
     )
-    assert res_auth.status_code == 409
-    assert "Only lecturers can be authorized" in res_auth.json()["detail"]
+    assert res_auth.status_code == 200
+    data = res_auth.json()
+    assert data["authorized"] == 0
+    assert len(data["failed"]) == 1
+    assert "Only lecturers can be authorized" in data["failed"][0]["reason"]
     
-    # 2. Authorize already authorized lecturer
+    # 2. Authorize already authorized lecturer — should report as failed
     lecturer_payload = {
         "email": "lecturer_auth_test@test.com",
         "password": "password123",
@@ -53,18 +58,21 @@ async def test_admin_authorize_lecturer_coverage(
     # First authorization
     await async_client.post(
         "/api/v1/admin/staff/authorize", 
-        json={"user_id": str(lecturer_id)}, 
+        json={"user_ids": [str(lecturer_id)]}, 
         headers=admin_headers
     )
     
     # Second authorization (already authorized)
     res_auth2 = await async_client.post(
         "/api/v1/admin/staff/authorize", 
-        json={"user_id": str(lecturer_id)}, 
+        json={"user_ids": [str(lecturer_id)]}, 
         headers=admin_headers
     )
-    assert res_auth2.status_code == 409
-    assert "already authorized" in res_auth2.json()["detail"]
+    assert res_auth2.status_code == 200
+    data2 = res_auth2.json()
+    assert data2["authorized"] == 0
+    assert len(data2["failed"]) == 1
+    assert "already authorized" in data2["failed"][0]["reason"]
 
 @pytest.mark.asyncio
 async def test_admin_assign_hod_coverage(
@@ -73,19 +81,37 @@ async def test_admin_assign_hod_coverage(
     hod_user: User,
     db_session: AsyncSession
 ) -> None:
+    """
+    Validates that assigning a non-HOD role as HOD is rejected.
+
+    Expected response:
+      POST /admin/departments/:id/hod with a student's user_id -> 409
+      POST /admin/departments/:id/hod with a HOD user's user_id -> 200 { message }
+    """
     # Create faculty and dept
-    fac_res = await async_client.post("/api/v1/admin/faculties", json={"name": "F", "code": "F"}, headers=admin_headers)
-    faculty_id = fac_res.json()["id"]
-    dept_res = await async_client.post(f"/api/v1/admin/faculties/{faculty_id}/departments", json={"name": "D", "code": "D"}, headers=admin_headers)
-    dept_id = dept_res.json()["id"]
+    fac_res = await async_client.post(
+        "/api/v1/admin/faculties",
+        json={"name": "F", "code": "F"},
+        headers=admin_headers
+    )
+    faculty_id = fac_res.json()["faculty"]["id"]
+
+    dept_res = await async_client.post(
+        f"/api/v1/admin/faculties/{faculty_id}/departments",
+        json={"name": "D", "code": "D"},
+        headers=admin_headers
+    )
+    dept_id = dept_res.json()["department"]["id"]
     
-    # 1. Assign HOD: user not HOD role (student)
+    # 1. Assign HOD: user not HOD role (student) — expect 409
     student_payload = {
         "email": "student_hod_test@test.com",
         "password": "password123",
         "first_name": "Bad",
         "last_name": "Hod",
-        "phone": "12345678"
+        "phone": "12345678",
+        "matric_num": "STUD002",
+        "admission_session": "2024/2025"
     }
     reg_res = await async_client.post("/api/v1/auth/register/student", json=student_payload)
     assert reg_res.status_code == 201
@@ -95,7 +121,7 @@ async def test_admin_assign_hod_coverage(
     
     res_assign = await async_client.post(
         f"/api/v1/admin/departments/{dept_id}/hod", 
-        json={"hod_id": str(student_id)}, 
+        json={"user_id": str(student_id)},   # spec uses user_id not hod_id
         headers=admin_headers
     )
     assert res_assign.status_code == 409

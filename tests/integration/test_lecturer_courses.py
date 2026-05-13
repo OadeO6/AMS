@@ -18,9 +18,10 @@ async def test_lecturer_list_and_get_courses(async_client: AsyncClient, get_auth
     # List courses
     resp = await async_client.get("/api/v1/lecturer/courses", headers=headers)
     assert resp.status_code == 200
-    data = resp.json()
-    assert len(data) == 1
-    assert data[0]["id"] == str(setup_lecturer_data["offering"].id)
+    courses = resp.json().get("courses", [])
+    assert len(courses) == 1
+    # Check ID since students interact with offering IDs
+    assert courses[0]["id"] == str(setup_lecturer_data["offering"].id)
     
     # Get specific course
     resp = await async_client.get(f"/api/v1/lecturer/courses/{setup_lecturer_data['offering'].id}", headers=headers)
@@ -34,19 +35,47 @@ async def test_lecturer_manage_students(async_client: AsyncClient, get_auth_head
     offering_id = setup_lecturer_data["offering"].id
     student_id = setup_lecturer_data["student"].id
     
-    # List students
-    resp = await async_client.get(f"/api/v1/lecturer/courses/{offering_id}/students", headers=headers)
-    assert resp.status_code == 200
-    students = resp.json()
-    assert len(students) == 1
-    assert students[0]["student_id"] == str(student_id)
-    assert students[0]["status"] == "approved"
+    # View students
+    resp2 = await async_client.get(f"/api/v1/lecturer/courses/{offering_id}/students", headers=headers)
+    assert resp2.status_code == 200
+    students_list = resp2.json().get("students", [])
+    assert len(students_list) == 1
+    assert students_list[0]["id"] == str(student_id)
+    assert students_list[0]["registration_status"] == "approved"
     
     # Approve student
-    resp = await async_client.patch(f"/api/v1/lecturer/courses/{offering_id}/students/{student_id}/approve", headers=headers)
+    resp = await async_client.patch(
+        f"/api/v1/lecturer/courses/{offering_id}/students/{student_id}/approve",
+        json={"status": "approved"},
+        headers=headers
+    )
     assert resp.status_code == 200
-    assert resp.json()["status"] == "approved"
+    assert "message" in resp.json()
     
     # Verify via DB
     await db_session.refresh(setup_lecturer_data["registration"])
     assert setup_lecturer_data["registration"].status == "approved"
+
+    # Test Reject student
+    resp = await async_client.patch(
+        f"/api/v1/lecturer/courses/{offering_id}/students/{student_id}/approve",
+        json={"status": "rejected"},
+        headers=headers
+    )
+    assert resp.status_code == 200
+    
+    # Test Invalid Status (422)
+    resp = await async_client.patch(
+        f"/api/v1/lecturer/courses/{offering_id}/students/{student_id}/approve",
+        json={"status": "invalid"},
+        headers=headers
+    )
+    assert resp.status_code == 422
+
+    # Test Non-existent student (404)
+    resp = await async_client.patch(
+        f"/api/v1/lecturer/courses/{offering_id}/students/{uuid.uuid4()}/approve",
+        json={"status": "approved"},
+        headers=headers
+    )
+    assert resp.status_code == 404
