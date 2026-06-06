@@ -56,13 +56,16 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    
+    DEFAULT_ADMIN_EMAIL: str = "admin@ams.edu"
+    DEFAULT_ADMIN_PASSWORD: str = "TestPass123!"
 
     # ------------------------------------------------------------------
     # CORS & Trusted Hosts
     # ------------------------------------------------------------------
     # Stored as a JSON array string in env; parsed to list[str] by the validator.
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
-    ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1"]
+    ALLOWED_ORIGINS: list[str] = ["*"]
+    ALLOWED_HOSTS: list[str] = ["*"]
 
     # ------------------------------------------------------------------
     # OpenTelemetry
@@ -82,6 +85,7 @@ class Settings(BaseSettings):
     AWS_ACCESS_KEY_ID: str | None = None
     AWS_SECRET_ACCESS_KEY: str | None = None
     S3_BUCKET_NAME: str = "ams-storage-bucket"
+    S3_ENDPOINT_URL: str | None = None
 
     OPENAI_API_KEY: str | None = None
 
