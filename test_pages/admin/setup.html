@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — Admin Setup</title>
+    <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+    <header class="old-header" style="display:none"><span class="current">Admin Setup</span></header>
+
+    <main>
+        <section class="page-content" id="content">
+            <a href="index.html" class="back-link">← Back to Admin Console</a>
+            <h1>🏛️ Admin Setup</h1>
+            <p class="subtitle">Set up the institution structure, faculties, departments, and academic sessions.</p>
+
+            <div id="auth-warn" class="alert warn hidden">
+                You must log in as an Admin to use this page.
+            </div>
+
+            <div id="admin-content" class="hidden">
+                <!-- Session & Semester Setup -->
+                <div class="section">
+                    <h3>1 — Academic Session & Semester</h3>
+                    <div class="section-box">
+                        <div class="field">
+                            <label>Session Name</label>
+                            <input type="text" id="sess-name" placeholder="e.g. 2024/2025" value="2024/2025">
+                        </div>
+                        <div class="row row-2">
+                            <div class="field">
+                                <label>Semester 1 Start</label>
+                                <input type="date" id="sem1-start" value="2024-09-01">
+                            </div>
+                            <div class="field">
+                                <label>Semester 1 End</label>
+                                <input type="date" id="sem1-end" value="2025-01-31">
+                            </div>
+                        </div>
+                        <div class="row row-2">
+                            <div class="field">
+                                <label>Semester 2 Start</label>
+                                <input type="date" id="sem2-start" value="2025-02-15">
+                            </div>
+                            <div class="field">
+                                <label>Semester 2 End</label>
+                                <input type="date" id="sem2-end" value="2025-07-30">
+                            </div>
+                        </div>
+                        <button class="btn" id="btn-create-session">Create Session</button>
+                        <pre id="sess-out" class="output"></pre>
+                    </div>
+
+                    <div class="section-box" style="margin-top:16px;">
+                        <h4>Activate Semester</h4>
+                        <div class="row row-auto">
+                            <div class="field" style="flex:1">
+                                <select id="sem-activate-sel"><option value="">— Load sessions first —</option></select>
+                            </div>
+                            <button class="btn btn-sm" id="btn-activate-sem">Activate</button>
+                            <button class="btn btn-sm btn-ghost" onclick="loadSessions()">↻</button>
+                        </div>
+                        <pre id="act-out" class="output"></pre>
+                    </div>
+                </div>
+
+                <!-- Faculty & Dept Setup -->
+                <div class="section">
+                    <h3>2 — Faculties & Departments</h3>
+                    
+                    <div class="section-box">
+                        <h4>Create Faculty</h4>
+                        <div class="row row-2">
+                            <div class="field">
+                                <label>Name</label><input type="text" id="fac-name" placeholder="Faculty of Engineering">
+                            </div>
+                            <div class="field">
+                                <label>Code</label><input type="text" id="fac-code" placeholder="ENG">
+                            </div>
+                        </div>
+                        <button class="btn btn-sm" id="btn-create-fac">Create Faculty</button>
+                        <pre id="fac-out" class="output"></pre>
+                    </div>
+
+                    <div class="section-box" style="margin-top:16px;">
+                        <h4>Create Department</h4>
+                        <div class="row row-auto">
+                            <div class="field" style="flex:1">
+                                <label>Select Faculty</label>
+                                <select id="fac-sel"><option value="">— Load faculties first —</option></select>
+                            </div>
+                            <button class="btn btn-sm btn-ghost" onclick="loadFaculties()" style="align-self:flex-end;margin-bottom:4px;">↻</button>
+                        </div>
+                        <div class="row row-2" style="margin-top:8px">
+                            <div class="field">
+                                <label>Dept Name</label><input type="text" id="dept-name" placeholder="Computer Engineering">
+                            </div>
+                            <div class="field">
+                                <label>Dept Code</label><input type="text" id="dept-code" placeholder="CPE">
+                            </div>
+                        </div>
+                        <button class="btn btn-sm" id="btn-create-dept">Create Department</button>
+                        <pre id="dept-out" class="output"></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="../shared/layout.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/auth.js"></script>
+    <script>
+        // ── Auth Check ──
+        function checkAuth() {
+            const a = auth.getActiveRole();
+            const isAdmin = a && a.role === 'admin';
+            document.getElementById('auth-warn').classList.toggle('hidden', isAdmin);
+            document.getElementById('admin-content').classList.toggle('hidden', !isAdmin);
+            if (isAdmin) {
+                loadSessions();
+                loadFaculties();
+            }
+        }
+        
+        window.addEventListener('roleChanged', checkAuth);
+        if (auth.getActiveRole()) checkAuth();
+
+        // ── Sessions & Semesters ──
+        document.getElementById('btn-create-session').addEventListener('click', async () => {
+            const body = {
+                name: document.getElementById('sess-name').value,
+                semesters: [
+                    { name: 'first', start_date: document.getElementById('sem1-start').value, end_date: document.getElementById('sem1-end').value },
+                    { name: 'second', start_date: document.getElementById('sem2-start').value, end_date: document.getElementById('sem2-end').value }
+                ]
+            };
+            try {
+                const res = await api.post('/admin/academic-sessions', body);
+                setOutput('sess-out', res);
+                showToast('Session created', 'success');
+                loadSessions();
+            } catch (e) {
+                setOutput('sess-out', e.data || e.message, true);
+            }
+        });
+
+        async function loadSessions() {
+            const sel = document.getElementById('sem-activate-sel');
+            sel.innerHTML = '<option value="">— Loading... —</option>';
+            try {
+                const res = await api.get('/admin/academic-sessions');
+                let opts = '<option value="">— Select a semester to activate —</option>';
+                for (const sess of res.sessions) {
+                    for (const sem of sess.semesters) {
+                        opts += `<option value="${sem.id}">${sess.name} — ${sem.name} semester ${sem.is_active ? '(ACTIVE)' : ''}</option>`;
+                    }
+                }
+                sel.innerHTML = opts;
+            } catch (e) {
+                sel.innerHTML = '<option value="">— Error loading —</option>';
+            }
+        }
+
+        document.getElementById('btn-activate-sem').addEventListener('click', async () => {
+            const semId = document.getElementById('sem-activate-sel').value;
+            if (!semId) return;
+            try {
+                const res = await api.patch(`/admin/semesters/${semId}/activate`, {});
+                setOutput('act-out', res);
+                showToast('Semester activated', 'success');
+                loadSessions();
+            } catch (e) {
+                setOutput('act-out', e.data || e.message, true);
+            }
+        });
+
+        // ── Faculties & Departments ──
+        document.getElementById('btn-create-fac').addEventListener('click', async () => {
+            const body = {
+                name: document.getElementById('fac-name').value,
+                code: document.getElementById('fac-code').value
+            };
+            try {
+                const res = await api.post('/admin/faculties', body);
+                setOutput('fac-out', res);
+                showToast('Faculty created', 'success');
+                loadFaculties();
+            } catch (e) {
+                setOutput('fac-out', e.data || e.message, true);
+            }
+        });
+
+        async function loadFaculties() {
+            const sel = document.getElementById('fac-sel');
+            sel.innerHTML = '<option value="">— Loading... —</option>';
+            try {
+                const res = await api.get('/admin/faculties');
+                let opts = '<option value="">— Select a faculty —</option>';
+                for (const f of res.faculties) {
+                    opts += `<option value="${f.id}">${f.name} (${f.code})</option>`;
+                }
+                sel.innerHTML = opts;
+            } catch (e) {
+                sel.innerHTML = '<option value="">— Error loading —</option>';
+            }
+        }
+
+        document.getElementById('btn-create-dept').addEventListener('click', async () => {
+            const facId = document.getElementById('fac-sel').value;
+            if (!facId) { setOutput('dept-out', 'Select a faculty first', true); return; }
+            const body = {
+                name: document.getElementById('dept-name').value,
+                code: document.getElementById('dept-code').value
+            };
+            try {
+                const res = await api.post(`/admin/faculties/${facId}/departments`, body);
+                setOutput('dept-out', res);
+                showToast('Department created', 'success');
+            } catch (e) {
+                setOutput('dept-out', e.data || e.message, true);
+            }
+        });
+    </script>
+</body>
+</html>

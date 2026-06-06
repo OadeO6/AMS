@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — Staff Management</title>
+    <link rel="stylesheet" href="../shared/style.css">
+    <style>
+        .list-item {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .list-item-meta { font-size: 0.8rem; color: var(--text-dim); }
+    </style>
+</head>
+<body>
+    <header class="old-header" style="display:none"><span class="current">Staff Management</span></header>
+
+    <main>
+        <section class="page-content" id="content">
+            <a href="index.html" class="back-link">← Back to Admin Console</a>
+            <h1>👥 Staff Management</h1>
+            <p class="subtitle">Review and authorize staff accounts for the institution.</p>
+
+            <div id="auth-warn" class="alert warn hidden">
+                You must log in as an Admin to use this page.
+            </div>
+
+            <div id="admin-content" class="hidden">
+                <div class="section">
+                    <h3>Lecturer Authorizations</h3>
+                    <div class="row row-auto" style="margin-bottom:12px">
+                        <select id="status-filter" style="width:140px" onchange="loadLecturers()">
+                            <option value="">All Statuses</option>
+                            <option value="pending">Pending Only</option>
+                            <option value="authorized">Authorized Only</option>
+                        </select>
+                        <button class="btn btn-sm btn-ghost" onclick="loadLecturers()">↻ Refresh</button>
+                    </div>
+                    <div id="lecturer-list" class="empty">
+                        <p>Loading lecturers...</p>
+                    </div>
+                    <pre id="action-out" class="output hidden"></pre>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="../shared/layout.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/auth.js"></script>
+    <script>
+        function checkAuth() {
+            const a = auth.getActiveRole();
+            const isAdmin = a && a.role === 'admin';
+            document.getElementById('auth-warn').classList.toggle('hidden', isAdmin);
+            document.getElementById('admin-content').classList.toggle('hidden', !isAdmin);
+            if (isAdmin) loadLecturers();
+        }
+        
+        window.addEventListener('roleChanged', checkAuth);
+        if (auth.getActiveRole()) checkAuth();
+
+        async function loadLecturers() {
+            const list = document.getElementById('lecturer-list');
+            list.innerHTML = '<p>Loading...</p>';
+            list.className = '';
+            
+            try {
+                // Fetch users with lecturer role
+                const res = await api.get('/admin/users?role=lecturer&limit=100');
+                const statusFilter = document.getElementById('status-filter').value;
+                let users = res.users || [];
+                
+                if (statusFilter === 'pending') {
+                    users = users.filter(u => !(u.is_authorized || u.authorized));
+                } else if (statusFilter === 'authorized') {
+                    users = users.filter(u => (u.is_authorized || u.authorized));
+                }
+
+                if (!users || users.length === 0) {
+                    list.innerHTML = statusFilter
+                        ? `<div style="padding: 12px;"><p>No ${statusFilter} lecturers found in the system.</p></div>`
+                        : '<p>No lecturers found in the system.</p>';
+                    list.className = 'empty';
+                    return;
+                }
+
+                let html = '';
+                for (const u of users) {
+                    const isAuthorized = u.is_authorized || u.authorized;
+                    const color = isAuthorized ? 'var(--accent)' : 'var(--red)';
+                    
+                    html += `
+                        <div class="list-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                <div>
+                                    <div style="font-weight:600">${u.first_name} ${u.last_name}</div>
+                                    <div class="list-item-meta">
+                                        Email: ${u.email} • Staff ID: ${u.staff_id || 'N/A'} • 
+                                        Status: <span style="color:${color}">${isAuthorized ? 'AUTHORIZED' : 'PENDING'}</span>
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <button class="btn btn-sm btn-ghost" onclick="toggleDetails('${u.id}')">Details</button>
+                                    ${isAuthorized 
+                                        ? `<span style="font-size:0.8rem;color:var(--text-dim)">Authorized</span>` 
+                                        : `<button class="btn btn-sm" onclick="authorizeLecturer('${u.id}')">Authorize</button>`}
+                                </div>
+                            </div>
+                            
+                            <!-- Collapsible Details -->
+                            <div id="details-${u.id}" style="display: none; padding-top: 12px; border-top: 1px dashed var(--border); font-size: 0.8rem; color: var(--text-dim);">
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px;">
+                                    <div><strong>Phone:</strong> ${u.phone || 'N/A'}</div>
+                                    <div><strong>Department:</strong> ${u.department ? u.department.name : 'N/A'}</div>
+                                    <div><strong>User ID:</strong> <span style="font-family:var(--mono); font-size: 0.75rem;">${u.id}</span></div>
+                                    <div><strong>Joined:</strong> ${new Date(u.created_at).toLocaleString()}</div>
+                                    <div><strong>Status:</strong> ${u.is_active ? 'Active Account' : 'Inactive Account'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                list.innerHTML = html;
+            } catch (e) {
+                list.innerHTML = `<p style="color:var(--red)">Error: ${e.data ? e.data.detail || e.message : e.message}</p>`;
+            }
+        }
+
+        function toggleDetails(userId) {
+            const el = document.getElementById(`details-${userId}`);
+            if (el) {
+                el.style.display = el.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        async function authorizeLecturer(userId) {
+            const out = document.getElementById('action-out');
+            try {
+                const res = await api.post('/admin/staff/authorize', {
+                    user_ids: [userId]
+                });
+                out.classList.remove('hidden');
+                setOutput('action-out', res);
+                showToast('Lecturer authorized', 'success');
+                loadLecturers();
+            } catch (e) {
+                out.classList.remove('hidden');
+                setOutput('action-out', e.data || e.message, true);
+            }
+        }
+    </script>
+</body>
+</html>

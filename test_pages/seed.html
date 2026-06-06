@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — Database Seed</title>
+    <link rel="stylesheet" href="shared/style.css">
+    <style>
+        #seed-editor {
+            width: 100%;
+            height: 400px;
+            font-family: var(--mono);
+            font-size: 0.8rem;
+            padding: 12px;
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            resize: vertical;
+            white-space: pre;
+            overflow: auto;
+        }
+
+        .step-log {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .step-log:last-child {
+            border-bottom: none;
+        }
+
+        .step-log.success {
+            color: var(--accent);
+        }
+
+        .step-log.error {
+            color: var(--red);
+        }
+
+        .step-log.info {
+            color: var(--blue);
+        }
+    </style>
+</head>
+
+<body>
+    <header class="old-header" style="display:none"><span class="current">Database Seed</span></header>
+
+    <main>
+        <!-- ══════ Sidebar ══════ -->
+        
+
+        <section class="page-content" style="max-width: 1000px;">
+        <a href="index.html" class="back-link">← Back to Console</a>
+        <h1>🌱 Database Seed Script</h1>
+        <p class="subtitle">Edit the JSON below to define the sequence of API calls used to seed the test users and
+            required data.</p>
+
+        <div class="alert info" style="margin-bottom: 16px;">
+            <strong>Note:</strong> The default admin user is automatically created by the backend on startup using
+            credentials from the <code>.env</code> file. The first step below logs in as this admin to get the required
+            token for subsequent admin-only actions.
+        </div>
+
+        <div class="section-box" style="margin-top: 0;">
+            <div class="field">
+                <label>Seed Data (Editable JSON Sequence)</label>
+                <textarea id="seed-editor" spellcheck="false"></textarea>
+            </div>
+
+            <div class="row row-auto" style="margin-top: 12px;">
+                <button id="btn-run" class="btn">Run Seed Sequence</button>
+                <button id="btn-reset" class="btn btn-ghost btn-sm">Reset JSON</button>
+            </div>
+
+            <div id="seed-output" class="output" style="max-height: 400px; display: none; margin-top: 16px;"></div>
+        </div>
+    </div>
+
+        </section>
+    </main>
+
+    <script src="shared/layout.js"></script>
+    <script src="shared/api.js"></script>
+    <script src="shared/health.js"></script>
+    <script src="shared/auth.js"></script>
+    <script>
+        const DEFAULT_SEED_DATA = [
+            {
+                "name": "1. Login as Default Admin",
+                "endpoint": "/auth/login",
+                "method": "POST",
+                "body": {
+                    "email": "admin@ams.edu",
+                    "password": "TestPass123!"
+                },
+                "extract": "admin_token = response.access_token"
+            },
+            {
+                "name": "2. Create Faculty",
+                "endpoint": "/admin/faculties",
+                "method": "POST",
+                "auth_token_var": "admin_token",
+                "body": {
+                    "name": "Faculty of Engineering",
+                    "code": "ENG",
+                    "description": "Test Faculty"
+                },
+                "extract": "faculty_id = response.faculty.id",
+                "fallback_get": "/admin/faculties",
+                "fallback_match": "code=ENG",
+                "fallback_extract_list": "faculties"
+            },
+            {
+                "name": "3. Create Department",
+                "endpoint": "/admin/faculties/{{faculty_id}}/departments",
+                "method": "POST",
+                "auth_token_var": "admin_token",
+                "body": {
+                    "name": "Computer Engineering",
+                    "code": "CPE"
+                },
+                "extract": "department_id = response.department.id",
+                "fallback_get": "/admin/faculties/{{faculty_id}}/departments",
+                "fallback_match": "code=CPE",
+                "fallback_extract_list": "departments"
+            },
+            {
+                "name": "4. Register Lecturer",
+                "endpoint": "/auth/register/lecturer",
+                "method": "POST",
+                "body": {
+                    "first_name": "Test",
+                    "last_name": "Lecturer",
+                    "email": "lecturer@ams.edu",
+                    "password": "TestPass123!",
+                    "staff_id": "LEC001",
+                    "department_id": "{{department_id}}"
+                },
+                "ignore_409": true
+            },
+            {
+                "name": "5. Register Student",
+                "endpoint": "/auth/register/student",
+                "method": "POST",
+                "body": {
+                    "first_name": "Test",
+                    "last_name": "Student",
+                    "email": "student@ams.edu",
+                    "password": "TestPass123!",
+                    "matric_num": "STU001",
+                    "admission_session": "2023/2024",
+                    "department_id": "{{department_id}}"
+                },
+                "ignore_409": true
+            },
+            {
+                "name": "6. Register HOD (as lecturer first)",
+                "endpoint": "/auth/register/lecturer",
+                "method": "POST",
+                "body": {
+                    "first_name": "Test",
+                    "last_name": "HOD",
+                    "email": "hod@ams.edu",
+                    "password": "TestPass123!",
+                    "staff_id": "HOD001",
+                    "department_id": "{{department_id}}"
+                },
+                "ignore_409": true
+            }
+        ];
+
+        const editor = document.getElementById('seed-editor');
+        const outContainer = document.getElementById('seed-output');
+
+        function loadJSON() {
+            const saved = localStorage.getItem('ams_seed_data');
+            if (saved) {
+                editor.value = saved;
+            } else {
+                editor.value = JSON.stringify(DEFAULT_SEED_DATA, null, 4);
+            }
+        }
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            if (confirm('Reset seed JSON to defaults?')) {
+                editor.value = JSON.stringify(DEFAULT_SEED_DATA, null, 4);
+                localStorage.removeItem('ams_seed_data');
+            }
+        });
+
+        editor.addEventListener('input', () => {
+            localStorage.setItem('ams_seed_data', editor.value);
+        });
+
+        loadJSON();
+
+        function logStep(msg, type = 'info') {
+            outContainer.style.display = 'block';
+            const div = document.createElement('div');
+            div.className = 'step-log ' + type;
+            div.textContent = msg;
+            outContainer.appendChild(div);
+            outContainer.scrollTop = outContainer.scrollHeight;
+        }
+
+        function extractValue(obj, path) {
+            const parts = path.replace('response.', '').split('.');
+            let current = obj;
+            for (let p of parts) {
+                if (current === undefined || current === null) return null;
+                current = current[p];
+            }
+            return current;
+        }
+
+        document.getElementById('btn-run').addEventListener('click', async () => {
+            let steps;
+            try {
+                steps = JSON.parse(editor.value);
+            } catch (e) {
+                showToast('Invalid JSON in editor', 'error');
+                return;
+            }
+
+            outContainer.innerHTML = '';
+            const btn = document.getElementById('btn-run');
+            btn.disabled = true;
+            btn.textContent = 'Running...';
+
+            const vars = {};
+
+            for (let i = 0; i < steps.length; i++) {
+                const step = steps[i];
+                logStep(`Running: ${step.name}...`);
+
+                let url = step.endpoint;
+                for (const [k, v] of Object.entries(vars)) {
+                    url = url.replace(`{{${k}}}`, v);
+                }
+
+                let bodyStr = JSON.stringify(step.body);
+                for (const [k, v] of Object.entries(vars)) {
+                    bodyStr = bodyStr.replace(new RegExp(`{{${k}}}`, 'g'), v);
+                }
+                const body = JSON.parse(bodyStr);
+
+                let headers = { 'Content-Type': 'application/json' };
+                if (step.auth_token_var && vars[step.auth_token_var]) {
+                    headers['Authorization'] = 'Bearer ' + vars[step.auth_token_var];
+                }
+
+                try {
+                    const res = await fetch(api.baseUrl + url, {
+                        method: step.method,
+                        headers: headers,
+                        body: JSON.stringify(body)
+                    });
+
+                    let data;
+                    const text = await res.text();
+                    try { data = JSON.parse(text); } catch { data = text; }
+
+                    if (!res.ok) {
+                        if (res.status === 409) {
+                            if (step.ignore_409) {
+                                logStep(`  └ Warning: 409 Conflict. Already exists, ignoring and continuing.`, 'warn');
+                                continue;
+                            }
+                            if (step.fallback_get) {
+                                logStep(`  └ 409 Conflict. Running fallback to fetch existing ID...`, 'warn');
+                                let fbUrl = step.fallback_get;
+                                for (const [k, v] of Object.entries(vars)) {
+                                    fbUrl = fbUrl.replace(`{{${k}}}`, v);
+                                }
+                                const fbRes = await fetch(api.baseUrl + fbUrl, { headers });
+                                const fbData = await fbRes.json();
+                                if (fbRes.ok && step.fallback_match) {
+                                    const [mKey, mVal] = step.fallback_match.split('=');
+                                    let items = fbData[step.fallback_extract_list] || fbData;
+                                    const found = items.find(x => x[mKey] === mVal);
+                                    if (found && step.extract) {
+                                        const [varName] = step.extract.split('=').map(s => s.trim());
+                                        vars[varName] = found.id;
+                                        logStep(`  └ Recovered ${varName}: ${found.id}`, 'info');
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                        throw new Error(data.detail || data.message || `HTTP ${res.status}`);
+                    }
+
+                    logStep(`✓ Success: ${step.name}`, 'success');
+
+                    if (step.extract && data) {
+                        const [varName, path] = step.extract.split('=').map(s => s.trim());
+                        const val = extractValue(data, path);
+                        if (val) {
+                            vars[varName] = val;
+                            logStep(`  └ Extracted ${varName}: ${val}`, 'info');
+                        } else {
+                            logStep(`  └ Failed to extract ${varName} from ${path}`, 'error');
+                        }
+                    }
+
+                } catch (e) {
+                    logStep(`✗ Failed: ${step.name} - ${e.message}`, 'error');
+                    logStep(`Aborting sequence.`, 'error');
+                    break;
+                }
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Run Seed Sequence';
+        });
+    </script>
+</body>
+
+</html>

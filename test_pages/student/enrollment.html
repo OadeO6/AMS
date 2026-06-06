@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — Student Enrollment</title>
+    <link rel="stylesheet" href="../shared/style.css">
+    <style>
+        .course-card {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .course-info h4 { margin: 0 0 4px 0; }
+        .course-meta { font-size: 0.8rem; color: var(--text-dim); font-family: var(--mono); }
+    </style>
+</head>
+<body>
+    <header class="old-header" style="display:none"><span class="current">Student Enrollment</span></header>
+
+    <main>
+        <section class="page-content" id="content">
+            <a href="index.html" class="back-link">← Back to Student Console</a>
+            <h1>🎓 Student Enrollment</h1>
+            <p class="subtitle">Browse available course offerings for the active semester and register.</p>
+
+            <div id="auth-warn" class="alert warn hidden">
+                You must log in as a Student to use this page.
+            </div>
+
+            <div id="student-content" class="hidden">
+                <div class="section">
+                    <h3>Available Course Offerings</h3>
+                    <div class="row row-auto" style="margin-bottom:12px">
+                        <button class="btn btn-sm btn-ghost" onclick="loadAvailableCourses()">↻ Refresh List</button>
+                    </div>
+                    <div id="courses-list" class="empty">
+                        <p>No active courses found. Admin must activate a semester and HOD must create offerings.</p>
+                    </div>
+                    <pre id="reg-out" class="output hidden"></pre>
+                </div>
+
+                <div class="section">
+                    <h3>My Registrations</h3>
+                    <div class="row row-auto" style="margin-bottom:12px">
+                        <select id="status-filter" style="width:120px" onchange="loadMyCourses()">
+                            <option value="">All Statuses</option>
+                            <option value="pending">Pending Only</option>
+                            <option value="approved">Approved Only</option>
+                        </select>
+                        <button class="btn btn-sm btn-ghost" onclick="loadMyCourses()">↻ Refresh</button>
+                    </div>
+                    <div id="my-courses-list" class="empty">
+                        <p>You have not registered for any courses yet.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="../shared/layout.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/auth.js"></script>
+    <script>
+        function checkAuth() {
+            const a = auth.getActiveRole();
+            const isStudent = a && a.role === 'student';
+            document.getElementById('auth-warn').classList.toggle('hidden', isStudent);
+            document.getElementById('student-content').classList.toggle('hidden', !isStudent);
+            if (isStudent) {
+                loadAvailableCourses();
+                loadMyCourses();
+            }
+        }
+        
+        window.addEventListener('roleChanged', checkAuth);
+        if (auth.getActiveRole()) checkAuth();
+
+        async function loadAvailableCourses() {
+            const list = document.getElementById('courses-list');
+            list.innerHTML = '<p>Loading...</p>';
+            list.className = '';
+            try {
+                const res = await api.get('/student/courses'); // Note: endpoint is GET /student/courses or GET /courses depending on setup? 
+                // Wait! In student.py, `GET /courses` is for all available courses. `GET /student/courses` is for registered.
+                // Ah! `GET /courses` is the browse endpoint. Let's try it.
+                
+                const browseRes = await api.get('/courses');
+                if (!browseRes.courses || browseRes.courses.length === 0) {
+                    list.innerHTML = `
+                        <div style="padding: 12px; text-align: left;">
+                            <p>No active courses found.</p>
+                            <p style="font-size:0.8rem; color:var(--text-dim); margin-bottom: 12px;">The HOD must create course offerings for the active semester before you can register.</p>
+                            <a href="../hod/index.html" class="btn btn-sm">Go to HOD Setup</a>
+                        </div>
+                    `;
+                    list.className = 'empty';
+                    return;
+                }
+
+                let html = '';
+                for (const c of browseRes.courses) {
+                    html += `
+                        <div class="course-card">
+                            <div class="course-info">
+                                <h4>${c.title} (${c.code})</h4>
+                                <div class="course-meta">
+                                    Units: ${c.units || '?'} • Lecturer: ${c.lecturer ? c.lecturer.name || c.lecturer.first_name : 'TBA'}
+                                </div>
+                            </div>
+                            <button class="btn btn-sm" onclick="registerCourse('${c.id}')">Register</button>
+                        </div>
+                    `;
+                }
+                list.innerHTML = html;
+            } catch (e) {
+                list.innerHTML = `<p style="color:var(--red)">Error: ${e.data ? e.data.detail || e.message : e.message}</p>`;
+            }
+        }
+
+        async function loadMyCourses() {
+            const list = document.getElementById('my-courses-list');
+            const status = document.getElementById('status-filter').value;
+            list.innerHTML = '<p>Loading...</p>';
+            list.className = '';
+            try {
+                const url = status ? `/student/courses?status=${status}` : '/student/courses';
+                const res = await api.get(url);
+                if (!res.courses || res.courses.length === 0) {
+                    list.innerHTML = status ? `<p>You have no ${status} registrations.</p>` : '<p>You have not registered for any courses yet.</p>';
+                    list.className = 'empty';
+                    return;
+                }
+
+                let html = '';
+                for (const c of res.courses) {
+                    const statusColor = c.status === 'approved' ? 'var(--accent)' : 'var(--blue)';
+                    html += `
+                        <div class="course-card">
+                            <div class="course-info">
+                                <h4>${c.title} (${c.code})</h4>
+                                <div class="course-meta">
+                                    Status: <span style="color:${statusColor}">${c.status.toUpperCase()}</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="dropCourse('${c.id}')">Drop</button>
+                        </div>
+                    `;
+                }
+                list.innerHTML = html;
+            } catch (e) {
+                list.innerHTML = `<p style="color:var(--red)">Error: ${e.data ? e.data.detail || e.message : e.message}</p>`;
+            }
+        }
+
+        async function registerCourse(offeringId) {
+            const out = document.getElementById('reg-out');
+            try {
+                const res = await api.post(`/courses/${offeringId}/register`, {});
+                out.classList.remove('hidden');
+                setOutput('reg-out', res);
+                showToast('Registration request sent', 'success');
+                loadMyCourses();
+            } catch (e) {
+                out.classList.remove('hidden');
+                setOutput('reg-out', e.data || e.message, true);
+            }
+        }
+
+        async function dropCourse(offeringId) {
+            if (!confirm('Are you sure you want to drop this course?')) return;
+            const out = document.getElementById('reg-out');
+            try {
+                const res = await api.del(`/courses/${offeringId}/register`);
+                out.classList.remove('hidden');
+                setOutput('reg-out', res);
+                showToast('Course dropped', 'success');
+                loadMyCourses();
+            } catch (e) {
+                out.classList.remove('hidden');
+                setOutput('reg-out', e.data || e.message, true);
+            }
+        }
+    </script>
+</body>
+</html>

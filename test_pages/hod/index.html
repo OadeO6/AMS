@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — HOD Console</title>
+    <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+    <header class="old-header" style="display:none"><span class="current">HOD Console</span></header>
+
+    <main>
+        <section class="page-content" id="content">
+            <a href="../index.html" class="back-link">← Back to Main Console</a>
+            <h1>👔 HOD Console</h1>
+            <p class="subtitle">Select a department management task to perform.</p>
+
+            <div id="auth-warn" class="alert warn hidden">
+                You must log in as an HOD to use this console.
+            </div>
+
+            <div id="hod-content" class="hidden">
+                <div class="grid">
+                    <!-- Course Setup -->
+                    <a href="setup.html" class="test-card">
+                        <div class="tc-head">
+                            <span class="tc-icon">📚</span>
+                            <span class="tc-status ready">ready</span>
+                        </div>
+                        <h3>Course Setup</h3>
+                        <p>Create course definitions and course offerings.</p>
+                    </a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="../shared/layout.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/auth.js"></script>
+    <script>
+        function checkAuth() {
+            const a = auth.getActiveRole();
+            const isHod = a && a.role === 'hod';
+            document.getElementById('auth-warn').classList.toggle('hidden', isHod);
+            document.getElementById('hod-content').classList.toggle('hidden', !isHod);
+        }
+        
+        window.addEventListener('roleChanged', checkAuth);
+        if (auth.getActiveRole()) checkAuth();
+    </script>
+</body>
+</html>

@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — Materials Test</title>
+    <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+    <header class="old-header" style="display:none"><span class="current">Materials</span></header>
+
+    <main>
+        <!-- ══════ Sidebar ══════ -->
+        
+
+        <section class="page-content">
+        <a href="index.html" class="back-link">← Back to Materials Console</a>
+        <h1>📁 Materials</h1>
+        <p class="subtitle">Upload, browse, update, delete, and download course materials.</p>
+
+        <!-- ── Auth warning ── -->
+        <div id="auth-warn" class="alert warn hidden">
+            You are not logged in. <a href="../index.html" style="color:inherit;text-decoration:underline">Go to Console</a> to log in first.
+        </div>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: Select Course                                        -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <div class="section" id="step-course">
+            <h3>1 — Select Course</h3>
+            <div class="selector">
+                <div class="field">
+                    <label>Course (from your role)</label>
+                    <select id="course-select">
+                        <option value="">— loading courses —</option>
+                    </select>
+                </div>
+                <button class="btn btn-sm btn-ghost" onclick="loadCourses()" title="Refresh">↻</button>
+            </div>
+            <div id="course-info" class="alert info hidden"></div>
+            <div id="no-courses" class="empty hidden">
+                <p>No courses found for your current role.</p>
+                <div style="margin-top:12px">
+                    <p style="font-size:.72rem;">If you're a <strong>lecturer</strong>, the HOD needs to create a course offering and assign you.</p>
+                    <a href="../hod/setup.html" class="btn btn-sm" style="margin-top:4px">Go to HOD Setup</a>
+                </div>
+                <div style="margin-top:12px; border-top:1px solid var(--border); padding-top:12px">
+                    <p style="font-size:.72rem;">If you're a <strong>student</strong>, you must browse and register for a course first.</p>
+                    <a href="../student/enrollment.html" class="btn btn-sm" style="margin-top:4px">Go to Student Enrollment</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: Materials List                                       -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <div class="section hidden" id="step-materials">
+            <h3>2 — Materials</h3>
+
+            <!-- Role-specific note -->
+            <div id="lecturer-note" class="alert info hidden">
+                ⚠ <strong>Missing endpoint:</strong> There is no <code>GET /lecturer/courses/:id/materials</code> endpoint.
+                Listing uses the <strong>student</strong> endpoint. Switch to a student role to see materials, or upload below and track via the response.
+            </div>
+
+            <!-- Filter -->
+            <div class="selector">
+                <div class="field">
+                    <label>Filter by type</label>
+                    <select id="mat-type-filter">
+                        <option value="">All types</option>
+                        <option value="note">note</option>
+                        <option value="slide">slide</option>
+                        <option value="resource">resource</option>
+                    </select>
+                </div>
+                <button class="btn btn-sm btn-ghost" onclick="loadMaterials()">↻ Refresh</button>
+            </div>
+
+            <div id="mat-list" class="mat-list"><!-- JS --></div>
+            <div id="mat-empty" class="empty hidden">
+                <p>No materials yet for this course.</p>
+            </div>
+            <pre id="mat-list-output" class="output"></pre>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: Upload (Lecturer only)                               -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <div class="section hidden" id="step-upload">
+            <h3>3 — Upload Material <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.72rem;color:var(--blue)">(lecturer only)</span></h3>
+            <div class="section-box">
+                <div class="field">
+                    <label>Title</label>
+                    <input type="text" id="upl-title" placeholder="e.g. Lecture 1 — Introduction" spellcheck="false">
+                </div>
+                <div class="row row-2">
+                    <div class="field">
+                        <label>Type</label>
+                        <select id="upl-type">
+                            <option value="note">note</option>
+                            <option value="slide">slide</option>
+                            <option value="resource">resource</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Visibility</label>
+                        <select id="upl-visibility">
+                            <option value="both">both (students + AI)</option>
+                            <option value="students_only">students_only</option>
+                            <option value="ai_only">ai_only</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>File</label>
+                    <input type="file" id="upl-file">
+                </div>
+                <button id="btn-upload" class="btn">Upload Material</button>
+                <pre id="upl-output" class="output"></pre>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: Edit / Delete / Download (contextual)                -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <div class="section hidden" id="step-actions">
+            <h3>4 — Material Actions</h3>
+            <div class="section-box">
+                <div class="field">
+                    <label>Select Material</label>
+                    <select id="action-mat-select">
+                        <option value="">— select a material —</option>
+                    </select>
+                </div>
+
+                <div class="tab-row" style="margin-top:10px">
+                    <div class="tab active" data-act="download">Download</div>
+                    <div class="tab" data-act="edit">Edit</div>
+                    <div class="tab" data-act="delete">Delete</div>
+                </div>
+
+                <!-- Download -->
+                <div id="act-download">
+                    <p style="font-size:.78rem;color:var(--text-dim);margin-bottom:8px">
+                        Fetches the download URL via <code>GET /materials/:id/download</code>.
+                    </p>
+                    <button class="btn btn-sm" onclick="doDownload()">Get Download URL</button>
+                    <pre id="dl-output" class="output"></pre>
+                </div>
+
+                <!-- Edit -->
+                <div id="act-edit" class="hidden">
+                    <p style="font-size:.78rem;color:var(--text-dim);margin-bottom:8px">
+                        Updates metadata via <code>PATCH /lecturer/courses/:id/materials/:id</code>. Lecturer only.
+                    </p>
+                    <div class="row row-2">
+                        <div class="field">
+                            <label>New Title <span class="hint">(blank = skip)</span></label>
+                            <input type="text" id="edit-title" spellcheck="false">
+                        </div>
+                        <div class="field">
+                            <label>New Visibility</label>
+                            <select id="edit-visibility">
+                                <option value="">— no change —</option>
+                                <option value="both">both</option>
+                                <option value="students_only">students_only</option>
+                                <option value="ai_only">ai_only</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm" onclick="doEdit()">Update Material</button>
+                    <pre id="edit-output" class="output"></pre>
+                </div>
+
+                <!-- Delete -->
+                <div id="act-delete" class="hidden">
+                    <p style="font-size:.78rem;color:var(--text-dim);margin-bottom:8px">
+                        Deletes via <code>DELETE /lecturer/courses/:id/materials/:id</code>. Lecturer only.
+                    </p>
+                    <button class="btn btn-sm btn-danger" onclick="doDelete()">Delete Material</button>
+                    <pre id="del-output" class="output"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        </section>
+    </main>
+
+    <script src="../shared/layout.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/health.js"></script>
+    <script src="../shared/auth.js"></script>
+    <script>
+        // ── State ──
+        let courses = [];
+        let materials = [];
+        let selectedCourseId = null;
+
+        // ── Init ──
+        auth.renderHeaderBadge();
+        checkAuth();
+
+        window.addEventListener('roleChanged', () => {
+            auth.renderHeaderBadge();
+            checkAuth();
+            loadCourses();
+        });
+
+        function checkAuth() {
+            const a = auth.getActiveRole();
+            document.getElementById('auth-warn').classList.toggle('hidden', !!a);
+        }
+
+        // ══════════════════════════════════════════════════
+        // Course Loading
+        // ══════════════════════════════════════════════════
+
+        async function loadCourses() {
+            const a = auth.getActiveRole();
+            if (!a) return;
+            const sel = document.getElementById('course-select');
+            sel.innerHTML = '<option value="">— loading… —</option>';
+            document.getElementById('no-courses').classList.add('hidden');
+            document.getElementById('course-info').classList.add('hidden');
+
+            try {
+                let data;
+                if (a.role === 'lecturer') {
+                    data = await api.get('/lecturer/courses');
+                } else if (a.role === 'student') {
+                    data = await api.get('/student/courses');
+                } else {
+                    sel.innerHTML = '<option value="">— switch to lecturer or student —</option>';
+                    return;
+                }
+
+                courses = data.courses || [];
+                if (!courses.length) {
+                    sel.innerHTML = '<option value="">— no courses —</option>';
+                    document.getElementById('no-courses').classList.remove('hidden');
+                    hideSteps();
+                    return;
+                }
+
+                sel.innerHTML = '<option value="">— choose a course —</option>' +
+                    courses.map(c => `<option value="${c.id}">${c.code} — ${c.title}</option>`).join('');
+
+                // Restore previous selection if still valid
+                if (selectedCourseId && courses.find(c => c.id === selectedCourseId)) {
+                    sel.value = selectedCourseId;
+                    onCourseSelected();
+                }
+            } catch (e) {
+                sel.innerHTML = '<option value="">— error loading —</option>';
+                showToast('Failed to load courses: ' + e.message, 'error');
+            }
+        }
+
+        document.getElementById('course-select').addEventListener('change', onCourseSelected);
+
+        function onCourseSelected() {
+            const val = document.getElementById('course-select').value;
+            selectedCourseId = val || null;
+            if (!selectedCourseId) { hideSteps(); return; }
+
+            const c = courses.find(c => c.id === selectedCourseId);
+            if (c) {
+                const info = document.getElementById('course-info');
+                info.textContent = `Selected: ${c.code} — ${c.title} (ID: ${c.id})`;
+                info.classList.remove('hidden');
+            }
+
+            showSteps();
+            loadMaterials();
+        }
+
+        function hideSteps() {
+            ['step-materials','step-upload','step-actions'].forEach(id =>
+                document.getElementById(id).classList.add('hidden'));
+        }
+
+        function showSteps() {
+            const a = auth.getActiveRole();
+            document.getElementById('step-materials').classList.remove('hidden');
+            document.getElementById('step-actions').classList.remove('hidden');
+
+            // Show upload only for lecturers
+            const isLecturer = a && a.role === 'lecturer';
+            document.getElementById('step-upload').classList.toggle('hidden', !isLecturer);
+            document.getElementById('lecturer-note').classList.toggle('hidden', !isLecturer);
+        }
+
+        // ══════════════════════════════════════════════════
+        // Materials Loading
+        // ══════════════════════════════════════════════════
+
+        async function loadMaterials() {
+            if (!selectedCourseId) return;
+            const list = document.getElementById('mat-list');
+            const empty = document.getElementById('mat-empty');
+            list.innerHTML = '<div style="color:var(--text-dim);font-size:.78rem;padding:8px">Loading…</div>';
+            empty.classList.add('hidden');
+
+            const typeFilter = document.getElementById('mat-type-filter').value;
+
+            try {
+                const q = typeFilter ? { type: typeFilter } : undefined;
+                const data = await api.get(`/student/courses/${selectedCourseId}/materials`, q);
+                materials = data.materials || [];
+
+                if (!materials.length) {
+                    list.innerHTML = '';
+                    empty.classList.remove('hidden');
+                    populateMatSelect();
+                    return;
+                }
+
+                list.innerHTML = materials.map(m => `
+                    <div class="mat-item">
+                        <div class="mat-info">
+                            <span class="mat-title">${esc(m.title)}</span>
+                            <span class="mat-meta">${m.type} · ${m.visibility} · ${m.id.substring(0,8)}…</span>
+                        </div>
+                        <div class="mat-actions">
+                            <button class="btn btn-xs btn-ghost" onclick="copyId('${m.id}')">Copy ID</button>
+                            <button class="btn btn-xs btn-ghost" onclick="selectMat('${m.id}')">Select</button>
+                        </div>
+                    </div>`).join('');
+
+                populateMatSelect();
+                setOutput('mat-list-output', data);
+            } catch (e) {
+                list.innerHTML = '';
+                setOutput('mat-list-output', e.data || e.message, true);
+                // If it's a 403, it's because we're a lecturer
+                if (e.status === 403 || e.status === 401) {
+                    empty.classList.remove('hidden');
+                    empty.querySelector('p').textContent = 'Cannot list materials as this role. Switch to a student to browse.';
+                }
+            }
+        }
+
+        document.getElementById('mat-type-filter').addEventListener('change', loadMaterials);
+
+        function populateMatSelect() {
+            const sel = document.getElementById('action-mat-select');
+            sel.innerHTML = '<option value="">— select a material —</option>' +
+                materials.map(m => `<option value="${m.id}">${m.title} (${m.type})</option>`).join('');
+        }
+
+        function selectMat(id) {
+            document.getElementById('action-mat-select').value = id;
+            document.getElementById('step-actions').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // ══════════════════════════════════════════════════
+        // Upload
+        // ══════════════════════════════════════════════════
+
+        document.getElementById('btn-upload').addEventListener('click', async () => {
+            const title = document.getElementById('upl-title').value.trim();
+            const type = document.getElementById('upl-type').value;
+            const vis = document.getElementById('upl-visibility').value;
+            const file = document.getElementById('upl-file').files[0];
+
+            if (!title || !file) {
+                setOutput('upl-output', 'Title and file are required.', true);
+                return;
+            }
+
+            const fd = new FormData();
+            fd.append('title', title);
+            fd.append('type', type);
+            fd.append('visibility', vis);
+            fd.append('file', file);
+
+            const btn = document.getElementById('btn-upload');
+            btn.disabled = true; btn.textContent = 'Uploading…';
+            try {
+                const res = await api.upload(`/lecturer/courses/${selectedCourseId}/materials`, fd);
+                setOutput('upl-output', res);
+                showToast('✓ Material uploaded', 'success');
+                document.getElementById('upl-title').value = '';
+                document.getElementById('upl-file').value = '';
+                // Refresh list
+                loadMaterials();
+            } catch (e) {
+                setOutput('upl-output', e.data || e.message, true);
+                showToast('Upload failed: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = 'Upload Material';
+            }
+        });
+
+        // ══════════════════════════════════════════════════
+        // Actions: Download / Edit / Delete
+        // ══════════════════════════════════════════════════
+
+        // Tab switching
+        document.querySelectorAll('[data-act]').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('[data-act]').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                ['act-download','act-edit','act-delete'].forEach(id =>
+                    document.getElementById(id).classList.add('hidden'));
+                document.getElementById('act-' + tab.dataset.act).classList.remove('hidden');
+            });
+        });
+
+        function getSelectedMatId() {
+            const id = document.getElementById('action-mat-select').value;
+            if (!id) showToast('Select a material first', 'error');
+            return id;
+        }
+
+        async function doDownload() {
+            const id = getSelectedMatId();
+            if (!id) return;
+            try {
+                const res = await api.get(`/materials/${id}/download`);
+                setOutput('dl-output', res);
+                showToast('Download URL retrieved', 'success');
+            } catch (e) {
+                setOutput('dl-output', e.data || e.message, true);
+            }
+        }
+
+        async function doEdit() {
+            const id = getSelectedMatId();
+            if (!id) return;
+            const body = {};
+            const t = document.getElementById('edit-title').value.trim();
+            const v = document.getElementById('edit-visibility').value;
+            if (t) body.title = t;
+            if (v) body.visibility = v;
+            if (!Object.keys(body).length) {
+                setOutput('edit-output', 'Provide at least one field to update.', true);
+                return;
+            }
+            try {
+                const res = await api.patch(`/lecturer/courses/${selectedCourseId}/materials/${id}`, body);
+                setOutput('edit-output', res);
+                showToast('Material updated', 'success');
+                loadMaterials();
+            } catch (e) {
+                setOutput('edit-output', e.data || e.message, true);
+            }
+        }
+
+        async function doDelete() {
+            const id = getSelectedMatId();
+            if (!id) return;
+            if (!confirm('Delete this material?')) return;
+            try {
+                const res = await api.del(`/lecturer/courses/${selectedCourseId}/materials/${id}`);
+                setOutput('del-output', res);
+                showToast('Material deleted', 'success');
+                loadMaterials();
+            } catch (e) {
+                setOutput('del-output', e.data || e.message, true);
+            }
+        }
+
+        // ══════════════════════════════════════════════════
+        // Utilities
+        // ══════════════════════════════════════════════════
+
+        function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+        function copyId(id) { navigator.clipboard.writeText(id).then(() => showToast('Copied: ' + id, 'success')); }
+
+        // ── Init ──
+        if (auth.getActiveRole()) loadCourses();
+    </script>
+</body>
+</html>

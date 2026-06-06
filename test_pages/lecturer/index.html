@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — Lecturer Console</title>
+    <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+    <header class="old-header" style="display:none"><span class="current">Lecturer Console</span></header>
+
+    <main>
+        <section class="page-content" id="content">
+            <a href="../index.html" class="back-link">← Back to Main Console</a>
+            <h1>👨‍🏫 Lecturer Console</h1>
+            <p class="subtitle">Select a lecturer management task to perform.</p>
+
+            <div id="auth-warn" class="alert warn hidden">
+                You must log in as an Authorized Lecturer to use this console.
+            </div>
+            
+            <div id="unauth-warn" class="alert warn hidden">
+                <strong>Access Denied:</strong> Your account is pending authorization. Please ask an Admin to authorize you in the Staff Management console.
+            </div>
+
+            <div id="lecturer-content" class="hidden">
+                <div class="grid">
+                    <!-- Student Approvals -->
+                    <a href="approvals.html" class="test-card">
+                        <div class="tc-head">
+                            <span class="tc-icon">✅</span>
+                            <span class="tc-status ready">ready</span>
+                        </div>
+                        <h3>Student Approvals</h3>
+                        <p>Review and approve pending student registration requests for your courses.</p>
+                    </a>
+
+                    <!-- Announcements -->
+                    <a href="announcements.html" class="test-card">
+                        <div class="tc-head">
+                            <span class="tc-icon">📢</span>
+                            <span class="tc-status ready">ready</span>
+                        </div>
+                        <h3>Course Announcements</h3>
+                        <p>Post, list, update, and delete announcements for a course.</p>
+                    </a>
+
+                    <!-- Tasks -->
+                    <a href="tasks.html" class="test-card">
+                        <div class="tc-head">
+                            <span class="tc-icon">📝</span>
+                            <span class="tc-status ready">ready</span>
+                        </div>
+                        <h3>Tasks & Submissions</h3>
+                        <p>Create assignments, view submissions, and manage grading.</p>
+                    </a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="../shared/layout.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/auth.js"></script>
+    <script>
+        async function checkAuth() {
+            const a = auth.getActiveRole();
+            const isLecturer = a && a.role === 'lecturer';
+            
+            document.getElementById('auth-warn').classList.toggle('hidden', isLecturer);
+            document.getElementById('unauth-warn').classList.add('hidden');
+            document.getElementById('lecturer-content').classList.toggle('hidden', !isLecturer);
+
+            if (isLecturer) {
+                try {
+                    // Try to fetch courses. If it fails with 403, they are likely unauthorized.
+                    await api.get('/lecturer/courses');
+                } catch (e) {
+                    if (e.status === 403) {
+                        document.getElementById('lecturer-content').classList.add('hidden');
+                        document.getElementById('unauth-warn').classList.remove('hidden');
+                    }
+                }
+            }
+        }
+        
+        window.addEventListener('roleChanged', checkAuth);
+        if (auth.getActiveRole()) checkAuth();
+    </script>
+</body>
+</html>

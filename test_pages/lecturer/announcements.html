@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — Course Announcements</title>
+    <link rel="stylesheet" href="../shared/style.css">
+    <style>
+        .list-item {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px;
+            margin-bottom: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .list-item-meta { font-size: 0.8rem; color: var(--text-dim); }
+        .list-item-content { font-size: 0.9rem; padding-top: 8px; border-top: 1px dashed var(--border); }
+        .pinned-badge { font-size: 0.7rem; background: var(--accent); color: var(--surface); padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 8px; }
+    </style>
+</head>
+<body>
+    <header class="old-header" style="display:none"><span class="current">Course Announcements</span></header>
+
+    <main>
+        <section class="page-content" id="content">
+            <a href="index.html" class="back-link">← Back to Lecturer Console</a>
+            <h1>📢 Course Announcements</h1>
+            <p class="subtitle">Post and manage announcements for your assigned course offerings.</p>
+
+            <div id="auth-warn" class="alert warn hidden">
+                You must log in as an Authorized Lecturer to use this page.
+            </div>
+
+            <div id="lecturer-content" class="hidden">
+                <div class="section">
+                    <h3>1 — Select Course Offering</h3>
+                    <div class="row row-auto">
+                        <select id="course-sel" style="flex:1"><option value="">— Load courses first —</option></select>
+                        <button class="btn btn-sm btn-ghost" onclick="loadMyCourses()">↻</button>
+                    </div>
+                </div>
+
+                <div id="main-section" style="display:none">
+                    <div class="section">
+                        <h3>2 — Post Announcement</h3>
+                        <div class="section-box">
+                            <div class="field">
+                                <label>Title</label>
+                                <input type="text" id="ann-title" spellcheck="false" placeholder="e.g. Midterm Exam Date Changed">
+                            </div>
+                            <div class="field">
+                                <label>Content</label>
+                                <textarea id="ann-content" rows="3" placeholder="Write your announcement here..." style="width: 100%; padding: 8px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); color: var(--text);"></textarea>
+                            </div>
+                            <div class="field" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                                <input type="checkbox" id="ann-pinned" style="width: auto;">
+                                <label for="ann-pinned" style="margin: 0; font-weight: normal; cursor: pointer;">Pin to top</label>
+                            </div>
+                            <button id="btn-post" class="btn" style="margin-top: 16px;" onclick="postAnnouncement()">Post Announcement</button>
+                            <pre id="post-out" class="output hidden"></pre>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>3 — Existing Announcements</h3>
+                        <div class="row row-auto" style="margin-bottom:12px">
+                            <button class="btn btn-sm btn-ghost" onclick="loadAnnouncements()">↻ Refresh List</button>
+                        </div>
+                        <div id="ann-list" class="empty">
+                            <p>Loading announcements...</p>
+                        </div>
+                        <pre id="action-out" class="output hidden"></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="../shared/layout.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/auth.js"></script>
+    <script>
+        function checkAuth() {
+            const a = auth.getActiveRole();
+            const isLecturer = a && a.role === 'lecturer';
+            document.getElementById('auth-warn').classList.toggle('hidden', isLecturer);
+            document.getElementById('lecturer-content').classList.toggle('hidden', !isLecturer);
+            if (isLecturer) loadMyCourses();
+        }
+        
+        window.addEventListener('roleChanged', checkAuth);
+        if (auth.getActiveRole()) checkAuth();
+
+        document.getElementById('course-sel').addEventListener('change', (e) => {
+            if (e.target.value) {
+                document.getElementById('main-section').style.display = 'block';
+                loadAnnouncements();
+            } else {
+                document.getElementById('main-section').style.display = 'none';
+            }
+        });
+
+        async function loadMyCourses() {
+            const sel = document.getElementById('course-sel');
+            sel.innerHTML = '<option value="">— Loading... —</option>';
+            try {
+                const res = await api.get('/lecturer/courses');
+                if (!res.courses || res.courses.length === 0) {
+                    sel.innerHTML = '<option value="">— You have no assigned courses —</option>';
+                    return;
+                }
+                let opts = '<option value="">— Select a course —</option>';
+                for (const c of res.courses) {
+                    opts += `<option value="${c.id}">${c.title} (${c.code})</option>`;
+                }
+                sel.innerHTML = opts;
+            } catch (e) {
+                sel.innerHTML = '<option value="">— Error loading —</option>';
+            }
+        }
+
+        async function loadAnnouncements() {
+            const courseId = document.getElementById('course-sel').value;
+            if (!courseId) return;
+
+            const list = document.getElementById('ann-list');
+            list.innerHTML = '<p>Loading...</p>';
+            list.className = '';
+            
+            try {
+                const res = await api.get(`/lecturer/courses/${courseId}/announcements`);
+                if (!res.announcements || res.announcements.length === 0) {
+                    list.innerHTML = '<p>No announcements posted yet.</p>';
+                    list.className = 'empty';
+                    return;
+                }
+
+                let html = '';
+                for (const a of res.announcements) {
+                    html += `
+                        <div class="list-item">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div>
+                                    <div style="font-weight:600">${a.title} ${a.is_pinned ? '<span class="pinned-badge">PINNED</span>' : ''}</div>
+                                    <div class="list-item-meta">Posted: ${new Date(a.created_at).toLocaleString()}</div>
+                                </div>
+                                <div style="display: flex; gap: 8px;">
+                                    <button class="btn btn-sm btn-danger" onclick="deleteAnnouncement('${a.id}')">Delete</button>
+                                </div>
+                            </div>
+                            <div class="list-item-content">
+                                ${a.content.replace(/\n/g, '<br>')}
+                            </div>
+                        </div>
+                    `;
+                }
+                list.innerHTML = html;
+            } catch (e) {
+                list.innerHTML = `<p style="color:var(--red)">Error: ${e.data ? e.data.detail || e.message : e.message}</p>`;
+            }
+        }
+
+        async function postAnnouncement() {
+            const courseId = document.getElementById('course-sel').value;
+            const title = document.getElementById('ann-title').value.trim();
+            const content = document.getElementById('ann-content').value.trim();
+            const isPinned = document.getElementById('ann-pinned').checked;
+            const btn = document.getElementById('btn-post');
+            const out = document.getElementById('post-out');
+
+            if (!title || !content) return alert("Title and Content are required.");
+
+            btn.disabled = true;
+            btn.textContent = 'Posting...';
+            try {
+                const res = await api.post(`/lecturer/courses/${courseId}/announcements`, {
+                    title,
+                    content,
+                    is_pinned: isPinned
+                });
+                out.classList.remove('hidden');
+                setOutput('post-out', res);
+                showToast('Announcement posted!', 'success');
+                
+                // Clear form
+                document.getElementById('ann-title').value = '';
+                document.getElementById('ann-content').value = '';
+                document.getElementById('ann-pinned').checked = false;
+                
+                loadAnnouncements();
+            } catch (e) {
+                out.classList.remove('hidden');
+                setOutput('post-out', e.data || e.message, true);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Post Announcement';
+            }
+        }
+
+        async function deleteAnnouncement(annId) {
+            if (!confirm("Delete this announcement?")) return;
+            const courseId = document.getElementById('course-sel').value;
+            const out = document.getElementById('action-out');
+            
+            try {
+                const res = await api.del(`/lecturer/courses/${courseId}/announcements/${annId}`);
+                out.classList.remove('hidden');
+                setOutput('action-out', res);
+                showToast('Announcement deleted.', 'success');
+                loadAnnouncements();
+            } catch (e) {
+                out.classList.remove('hidden');
+                setOutput('action-out', e.data || e.message, true);
+            }
+        }
+    </script>
+</body>
+</html>

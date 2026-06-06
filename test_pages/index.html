@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — Test Console</title>
+    <link rel="stylesheet" href="shared/style.css">
+</head>
+<body>
+    <header class="old-header" style="display:none"><span class="current">Test Console</span></header>
+
+    <main>
+        <!-- ══════ Sidebar ══════ -->
+        
+
+        <!-- ══════ Content ══════ -->
+        <section id="content">
+            <h1>Test Catalogue</h1>
+            <p class="subtitle">Select a test suite to exercise backend features end-to-end.</p>
+
+            <div class="grid">
+                <!-- Database Seeder -->
+                <a href="seed.html" class="test-card" style="border-color: var(--blue);">
+                    <div class="tc-head">
+                        <span class="tc-icon">🌱</span>
+                        <span class="tc-status" style="background: var(--blue-dim); color: var(--blue);">tool</span>
+                    </div>
+                    <h3>Database Seed</h3>
+                    <p>Run editable sequence of API calls to seed users, faculties, and departments.</p>
+                </a>
+
+                <!-- Admin Setup -->
+                <a href="admin/index.html" class="test-card">
+                    <div class="tc-head">
+                        <span class="tc-icon">🏛️</span>
+                        <span class="tc-status ready">ready</span>
+                    </div>
+                    <h3>Admin Setup</h3>
+                    <p>Faculties, departments, sessions, semesters.</p>
+                </a>
+
+                <!-- HOD Setup -->
+                <a href="hod/index.html" class="test-card">
+                    <div class="tc-head">
+                        <span class="tc-icon">👔</span>
+                        <span class="tc-status ready">ready</span>
+                    </div>
+                    <h3>HOD Setup</h3>
+                    <p>Course definitions and offering creation.</p>
+                </a>
+
+                <!-- Student Enrollment -->
+                <a href="student/index.html" class="test-card">
+                    <div class="tc-head">
+                        <span class="tc-icon">🎓</span>
+                        <span class="tc-status ready">ready</span>
+                    </div>
+                    <h3>Student Enrollment</h3>
+                    <p>Browse available courses and register for them.</p>
+                </a>
+
+                <!-- Lecturer Management -->
+                <a href="lecturer/index.html" class="test-card">
+                    <div class="tc-head">
+                        <span class="tc-icon">👨‍🏫</span>
+                        <span class="tc-status ready">ready</span>
+                    </div>
+                    <h3>Lecturer Management</h3>
+                    <p>Approve student registrations for your courses.</p>
+                </a>
+
+                <!-- Materials -->
+                <a href="materials/index.html" class="test-card">
+                    <div class="tc-head">
+                        <span class="tc-icon">📁</span>
+                        <span class="tc-status ready">ready</span>
+                    </div>
+                    <h3>Materials</h3>
+                    <p>Upload, list, update, delete, and download course materials.</p>
+                </a>
+
+                <!-- Tasks & Submissions -->
+                <a href="lecturer/tasks.html" class="test-card">
+                    <div class="tc-head"><span class="tc-icon">📝</span><span class="tc-status ready">ready</span></div>
+                    <h3>Tasks & Submissions</h3>
+                    <p>Create tasks, submit answers, grade submissions.</p>
+                </a>
+
+                <!-- Announcements -->
+                <a href="lecturer/announcements.html" class="test-card">
+                    <div class="tc-head"><span class="tc-icon">📢</span><span class="tc-status ready">ready</span></div>
+                    <h3>Announcements</h3>
+                    <p>Post, list, and manage course announcements.</p>
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <script src="shared/layout.js"></script>
+    <script src="shared/api.js"></script>
+    <script src="shared/auth.js"></script>
+    <script>
+        // ── API URL ──
+        const urlInput = document.getElementById('api-url');
+        const urlShow  = document.getElementById('api-url-show');
+        function syncUrl() {
+            api.baseUrl = urlInput.value;
+            localStorage.setItem('ams_api_url', urlInput.value);
+            urlShow.textContent = urlInput.value;
+        }
+        const savedUrl = localStorage.getItem('ams_api_url');
+        if (savedUrl) { urlInput.value = savedUrl; api.baseUrl = savedUrl; }
+        urlShow.textContent = urlInput.value;
+        urlInput.addEventListener('input', syncUrl);
+
+        // ── Health Check ──
+        document.getElementById('btn-health').addEventListener('click', async () => {
+            const out = document.getElementById('health-output');
+            const dot = document.getElementById('health-dot');
+            out.textContent = 'Checking…';
+            out.className = 'output';
+            try {
+                const r = await api.get('/healthz');
+                out.textContent = JSON.stringify(r, null, 2);
+                out.className = 'output success';
+                dot.className = 'dot on';
+                dot.title = 'API online';
+            } catch (e) {
+                out.textContent = 'ERROR: ' + e.message;
+                out.className = 'output error';
+                dot.className = 'dot off';
+                dot.title = 'API offline';
+            }
+        });
+
+        // ── Init ──
+        auth.renderDefaults();
+        auth.renderRoleList();
+        auth.renderSessionCard();
+        document.getElementById('btn-health').click();
+    </script>
+</body>
+</html>

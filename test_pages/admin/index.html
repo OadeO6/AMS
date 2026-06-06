@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — Admin Console</title>
+    <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+    <header class="old-header" style="display:none"><span class="current">Admin Console</span></header>
+
+    <main>
+        <section class="page-content" id="content">
+            <a href="../index.html" class="back-link">← Back to Main Console</a>
+            <h1>🏛️ Admin Console</h1>
+            <p class="subtitle">Select an administrative task to perform.</p>
+
+            <div id="auth-warn" class="alert warn hidden">
+                You must log in as an Admin to use this console.
+            </div>
+
+            <div id="admin-content" class="hidden">
+                <div class="grid">
+                    <!-- Setup -->
+                    <a href="setup.html" class="test-card">
+                        <div class="tc-head">
+                            <span class="tc-icon">⚙️</span>
+                            <span class="tc-status ready">ready</span>
+                        </div>
+                        <h3>Institution Setup</h3>
+                        <p>Configure faculties, departments, sessions, and activate semesters.</p>
+                    </a>
+
+                    <!-- Staff Management -->
+                    <a href="staff.html" class="test-card">
+                        <div class="tc-head">
+                            <span class="tc-icon">👥</span>
+                            <span class="tc-status ready">ready</span>
+                        </div>
+                        <h3>Staff Management</h3>
+                        <p>Authorize lecturers and manage user accounts.</p>
+                    </a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="../shared/layout.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/auth.js"></script>
+    <script>
+        function checkAuth() {
+            const a = auth.getActiveRole();
+            const isAdmin = a && a.role === 'admin';
+            document.getElementById('auth-warn').classList.toggle('hidden', isAdmin);
+            document.getElementById('admin-content').classList.toggle('hidden', !isAdmin);
+        }
+        
+        window.addEventListener('roleChanged', checkAuth);
+        if (auth.getActiveRole()) checkAuth();
+    </script>
+</body>
+</html>

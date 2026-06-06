@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — HOD Setup</title>
+    <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+    <header class="old-header" style="display:none"><span class="current">HOD Setup</span></header>
+
+    <main>
+        <section class="page-content" id="content">
+            <a href="index.html" class="back-link">← Back to HOD Console</a>
+            <h1>👔 HOD Setup</h1>
+            <p class="subtitle">Set up course definitions and course offerings for your department.</p>
+
+            <div id="auth-warn" class="alert warn hidden">
+                You must log in as an HOD to use this page.
+            </div>
+
+            <div id="hod-content" class="hidden">
+                <!-- Course Definition Setup -->
+                <div class="section">
+                    <h3>1 — Course Definitions</h3>
+                    <div class="section-box">
+                        <div class="row row-2">
+                            <div class="field">
+                                <label>Course Title</label>
+                                <input type="text" id="course-title" placeholder="Introduction to Programming">
+                            </div>
+                            <div class="field">
+                                <label>Course Code</label>
+                                <input type="text" id="course-code" placeholder="CPE 101">
+                            </div>
+                        </div>
+                        <div class="row row-2">
+                            <div class="field">
+                                <label>Units</label>
+                                <input type="number" id="course-units" value="3" min="1" max="6">
+                            </div>
+                        </div>
+                        <button class="btn" id="btn-create-course">Create Course Definition</button>
+                        <pre id="course-out" class="output"></pre>
+                    </div>
+                </div>
+
+                <!-- Course Offering Setup -->
+                <div class="section">
+                    <h3>2 — Course Offerings</h3>
+                    <p class="subtitle">Activate a course for a semester and assign a lecturer.</p>
+                    
+                    <div class="section-box">
+                        <div class="field">
+                            <label>Select Course Definition</label>
+                            <div class="row row-auto">
+                                <select id="course-sel" style="flex:1"><option value="">— Load courses first —</option></select>
+                                <button class="btn btn-sm btn-ghost" onclick="loadCourses()">↻</button>
+                            </div>
+                        </div>
+
+                        <div class="field" style="margin-top:12px">
+                            <label>Select Semester (Admin Privileges Required)</label>
+                            <div class="row row-auto">
+                                <select id="sem-sel" style="flex:1"><option value="">— Load semesters first —</option></select>
+                                <button class="btn btn-sm btn-ghost" onclick="loadSemesters()">↻</button>
+                            </div>
+                        </div>
+
+                        <div class="field" style="margin-top:12px">
+                            <label>Assign Lecturer</label>
+                            <div class="row row-auto">
+                                <select id="lec-sel" style="flex:1"><option value="">— Load lecturers first —</option></select>
+                                <button class="btn btn-sm btn-ghost" onclick="loadLecturers()">↻</button>
+                            </div>
+                        </div>
+
+                        <button class="btn" id="btn-create-offering" style="margin-top:12px">Create Course Offering</button>
+                        <pre id="offering-out" class="output"></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="../shared/layout.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/auth.js"></script>
+    <script>
+        function checkAuth() {
+            const a = auth.getActiveRole();
+            const isHod = a && a.role === 'hod';
+            document.getElementById('auth-warn').classList.toggle('hidden', isHod);
+            document.getElementById('hod-content').classList.toggle('hidden', !isHod);
+            if (isHod) {
+                loadCourses();
+                loadLecturers();
+                loadSemesters();
+            }
+        }
+        
+        window.addEventListener('roleChanged', checkAuth);
+        if (auth.getActiveRole()) checkAuth();
+
+        // ── Create Course Definition ──
+        document.getElementById('btn-create-course').addEventListener('click', async () => {
+            const body = {
+                title: document.getElementById('course-title').value,
+                code: document.getElementById('course-code').value,
+                units: parseInt(document.getElementById('course-units').value)
+            };
+            try {
+                const res = await api.post('/hod/courses', body);
+                setOutput('course-out', res);
+                showToast('Course definition created', 'success');
+                loadCourses();
+            } catch (e) {
+                setOutput('course-out', e.data || e.message, true);
+            }
+        });
+
+        async function loadCourses() {
+            const sel = document.getElementById('course-sel');
+            sel.innerHTML = '<option value="">— Loading... —</option>';
+            try {
+                const res = await api.get('/hod/courses');
+                if (!res.courses || res.courses.length === 0) {
+                    sel.innerHTML = '<option value="">— No course definitions found. Create one above! —</option>';
+                    return;
+                }
+                let opts = '<option value="">— Select a course definition —</option>';
+                for (const c of res.courses) {
+                    opts += `<option value="${c.id}">${c.title} (${c.code})</option>`;
+                }
+                sel.innerHTML = opts;
+            } catch (e) {
+                sel.innerHTML = '<option value="">— Error loading —</option>';
+            }
+        }
+
+        async function loadLecturers() {
+            const sel = document.getElementById('lec-sel');
+            sel.innerHTML = '<option value="">— Loading... —</option>';
+            try {
+                const res = await api.get('/hod/lecturers');
+                let opts = '<option value="">— Select a lecturer —</option>';
+                for (const l of res.users || res.lecturers || []) { // depends on UserListResponse
+                    opts += `<option value="${l.id}">${l.first_name} ${l.last_name} (${l.email})</option>`;
+                }
+                sel.innerHTML = opts;
+            } catch (e) {
+                sel.innerHTML = '<option value="">— Error loading —</option>';
+            }
+        }
+
+        async function loadSemesters() {
+            const sel = document.getElementById('sem-sel');
+            sel.innerHTML = '<option value="">— Loading... —</option>';
+            
+            // To fetch semesters, we need admin token if the route is protected
+            const savedRoles = auth.getSavedRoles();
+            const admin = savedRoles.find(r => r.role === 'admin');
+            
+            if (!admin) {
+                sel.innerHTML = '<option value="">— Admin login required to fetch semesters —</option>';
+                return;
+            }
+
+            try {
+                // Manually inject admin auth header just for this fetch
+                const res = await fetch(api.baseUrl + '/admin/academic-sessions', {
+                    headers: { 'Authorization': 'Bearer ' + admin.access_token }
+                });
+                if (!res.ok) throw new Error('Failed to fetch semesters');
+                const data = await res.json();
+                
+                let opts = '<option value="">— Select an active semester —</option>';
+                for (const sess of data.sessions) {
+                    for (const sem of sess.semesters) {
+                        opts += `<option value="${sem.id}">${sess.name} — ${sem.name} semester ${sem.is_active ? '(ACTIVE)' : ''}</option>`;
+                    }
+                }
+                sel.innerHTML = opts;
+            } catch (e) {
+                sel.innerHTML = '<option value="">— Error loading semesters —</option>';
+            }
+        }
+
+        // ── Create Course Offering ──
+        document.getElementById('btn-create-offering').addEventListener('click', async () => {
+            const courseId = document.getElementById('course-sel').value;
+            if (!courseId) { setOutput('offering-out', 'Select a course first', true); return; }
+
+            const body = {
+                semester_id: document.getElementById('sem-sel').value,
+                lecturer_id: document.getElementById('lec-sel').value || null
+            };
+            
+            try {
+                const res = await api.post(`/hod/courses/${courseId}/offerings`, body);
+                setOutput('offering-out', res);
+                showToast('Course offering created', 'success');
+            } catch (e) {
+                setOutput('offering-out', e.data || e.message, true);
+            }
+        });
+    </script>
+</body>
+</html>

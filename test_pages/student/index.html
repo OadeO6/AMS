@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — Student Console</title>
+    <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+    <header class="old-header" style="display:none"><span class="current">Student Console</span></header>
+
+    <main>
+        <section class="page-content" id="content">
+            <a href="../index.html" class="back-link">← Back to Main Console</a>
+            <h1>🎓 Student Console</h1>
+            <p class="subtitle">Select a student action to perform.</p>
+
+            <div id="auth-warn" class="alert warn hidden">
+                You must log in as a Student to use this console.
+            </div>
+
+            <div id="student-content" class="hidden">
+                <div class="grid">
+                    <!-- Course Enrollment -->
+                    <a href="enrollment.html" class="test-card">
+                        <div class="tc-head">
+                            <span class="tc-icon">📝</span>
+                            <span class="tc-status ready">ready</span>
+                        </div>
+                        <h3>Course Enrollment</h3>
+                        <p>Browse available course offerings and submit registration requests.</p>
+                    </a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="../shared/layout.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/auth.js"></script>
+    <script>
+        function checkAuth() {
+            const a = auth.getActiveRole();
+            const isStudent = a && a.role === 'student';
+            document.getElementById('auth-warn').classList.toggle('hidden', isStudent);
+            document.getElementById('student-content').classList.toggle('hidden', !isStudent);
+        }
+        
+        window.addEventListener('roleChanged', checkAuth);
+        if (auth.getActiveRole()) checkAuth();
+    </script>
+</body>
+</html>

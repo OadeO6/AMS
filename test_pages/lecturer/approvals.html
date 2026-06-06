@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — Lecturer Management</title>
+    <link rel="stylesheet" href="../shared/style.css">
+    <style>
+        .list-item {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .list-item-meta { font-size: 0.8rem; color: var(--text-dim); }
+    </style>
+</head>
+<body>
+    <header class="old-header" style="display:none"><span class="current">Lecturer Management</span></header>
+
+    <main>
+        <section class="page-content" id="content">
+            <a href="index.html" class="back-link">← Back to Lecturer Console</a>
+            <h1>👨‍🏫 Lecturer Management</h1>
+            <p class="subtitle">Approve student registrations for your assigned course offerings.</p>
+
+            <div id="auth-warn" class="alert warn hidden">
+                You must log in as a Lecturer to use this page.
+            </div>
+
+            <div id="lecturer-content" class="hidden">
+                <div class="section">
+                    <h3>1 — Select Course Offering</h3>
+                    <div class="row row-auto">
+                        <select id="course-sel" style="flex:1"><option value="">— Load courses first —</option></select>
+                        <button class="btn btn-sm btn-ghost" onclick="loadMyCourses()">↻</button>
+                    </div>
+                </div>
+
+                <div class="section" id="students-section" style="display:none">
+                    <h3>2 — Student Registrations</h3>
+                    <div class="row row-auto" style="margin-bottom:12px">
+                        <select id="status-filter" style="width:120px" onchange="loadStudents()">
+                            <option value="">All Statuses</option>
+                            <option value="pending">Pending Only</option>
+                            <option value="approved">Approved Only</option>
+                        </select>
+                        <button class="btn btn-sm btn-ghost" onclick="loadStudents()">↻ Refresh</button>
+                    </div>
+                    <div id="students-list" class="empty">
+                        <p>No students have requested registration for this course yet.</p>
+                    </div>
+                    <pre id="action-out" class="output hidden"></pre>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="../shared/layout.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/auth.js"></script>
+    <script>
+        function checkAuth() {
+            const a = auth.getActiveRole();
+            const isLecturer = a && a.role === 'lecturer';
+            document.getElementById('auth-warn').classList.toggle('hidden', isLecturer);
+            document.getElementById('lecturer-content').classList.toggle('hidden', !isLecturer);
+            if (isLecturer) loadMyCourses();
+        }
+        
+        window.addEventListener('roleChanged', checkAuth);
+        if (auth.getActiveRole()) checkAuth();
+
+        document.getElementById('course-sel').addEventListener('change', (e) => {
+            if (e.target.value) {
+                document.getElementById('students-section').style.display = 'block';
+                loadStudents();
+            } else {
+                document.getElementById('students-section').style.display = 'none';
+            }
+        });
+
+        let assignedCourses = [];
+
+        async function loadMyCourses() {
+            const sel = document.getElementById('course-sel');
+            sel.innerHTML = '<option value="">— Loading... —</option>';
+            try {
+                const res = await api.get('/lecturer/courses');
+                assignedCourses = res.courses || [];
+                if (assignedCourses.length === 0) {
+                    sel.innerHTML = '<option value="">— You have no assigned courses —</option>';
+                    return;
+                }
+                let opts = '<option value="">— Select a course —</option>';
+                opts += '<option value="ALL" style="font-weight:bold; color:var(--accent)">🌟 All My Courses (Aggregated)</option>';
+                for (const c of assignedCourses) {
+                    opts += `<option value="${c.id}">${c.title} (${c.code})</option>`;
+                }
+                sel.innerHTML = opts;
+            } catch (e) {
+                sel.innerHTML = '<option value="">— Error loading —</option>';
+            }
+        }
+
+        async function loadStudents() {
+            const courseId = document.getElementById('course-sel').value;
+            if (!courseId) return;
+
+            const list = document.getElementById('students-list');
+            list.innerHTML = '<p>Loading...</p>';
+            list.className = '';
+            
+            try {
+                let allStudents = [];
+                
+                if (courseId === 'ALL') {
+                    // Aggregate across all assigned courses
+                    const promises = assignedCourses.map(c => api.get(`/lecturer/courses/${c.id}/students`).catch(() => ({ students: [] })));
+                    const results = await Promise.all(promises);
+                    for (let i = 0; i < results.length; i++) {
+                        const courseData = results[i].students || [];
+                        // Inject course info so the lecturer knows which course this student is from
+                        courseData.forEach(s => s._course_name = assignedCourses[i].code);
+                        allStudents.push(...courseData);
+                    }
+                } else {
+                    const res = await api.get(`/lecturer/courses/${courseId}/students`);
+                    allStudents = res.students || [];
+                }
+
+                const statusFilter = document.getElementById('status-filter').value;
+                if (statusFilter) {
+                    allStudents = allStudents.filter(s => s.registration_status === statusFilter);
+                }
+
+                if (!allStudents || allStudents.length === 0) {
+                    list.innerHTML = statusFilter 
+                        ? `<div style="padding: 12px;"><p>No ${statusFilter} students found.</p></div>`
+                        : `
+                        <div style="padding: 12px; text-align: left;">
+                            <p>No students have requested registration yet.</p>
+                            <p style="font-size:0.8rem; color:var(--text-dim); margin-bottom: 12px;">Students must initiate a registration request from their Enrollment page.</p>
+                            <a href="../student/enrollment.html" class="btn btn-sm">Go to Student Enrollment</a>
+                        </div>
+                    `;
+                    list.className = 'empty';
+                    return;
+                }
+
+                let html = '';
+                for (const s of allStudents) {
+                    const isApproved = s.registration_status === 'approved';
+                    const color = isApproved ? 'var(--accent)' : 'var(--blue)';
+                    const courseBadge = s._course_name ? `<span class="badge" style="margin-left:8px">${s._course_name}</span>` : '';
+                    
+                    html += `
+                        <div class="list-item">
+                            <div>
+                                <div style="font-weight:600">${s.first_name} ${s.last_name} ${courseBadge}</div>
+                                <div class="list-item-meta">Email: ${s.email} • Status: <span style="color:${color}">${s.registration_status.toUpperCase()}</span></div>
+                            </div>
+                            ${isApproved ? `<span style="font-size:0.8rem;color:var(--text-dim)">Approved</span>` : `<button class="btn btn-sm" onclick="approveStudent('${s.id}', '${courseId === 'ALL' ? assignedCourses.find(c => c.code === s._course_name).id : courseId}')">Approve</button>`}
+                        </div>
+                    `;
+                }
+                list.innerHTML = html;
+            } catch (e) {
+                list.innerHTML = `<p style="color:var(--red)">Error: ${e.data ? e.data.detail || e.message : e.message}</p>`;
+            }
+        }
+
+        async function approveStudent(studentId, targetCourseId) {
+            const courseId = targetCourseId || document.getElementById('course-sel').value;
+            const out = document.getElementById('action-out');
+            try {
+                const res = await api.patch(`/lecturer/courses/${courseId}/students/${studentId}/approve`, {
+                    status: 'approved'
+                });
+                out.classList.remove('hidden');
+                setOutput('action-out', res);
+                showToast('Student approved', 'success');
+                loadStudents();
+            } catch (e) {
+                out.classList.remove('hidden');
+                setOutput('action-out', e.data || e.message, true);
+            }
+        }
+    </script>
+</body>
+</html>
