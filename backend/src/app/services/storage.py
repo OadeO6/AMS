@@ -3,6 +3,7 @@ from typing import BinaryIO
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
+from botocore.client import Config
 
 from app.config import settings
 from app.exceptions import AppException
@@ -18,6 +19,8 @@ class StorageService:
                 "s3",
                 aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
                 aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                endpoint_url=settings.S3_ENDPOINT_URL,
+                config=Config(signature_version="s3v4"),
             )
         else:
             self.s3 = None
