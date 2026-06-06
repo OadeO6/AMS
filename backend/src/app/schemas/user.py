@@ -111,7 +111,7 @@ class UserPublic(BaseModel):
     hashed_password is intentionally absent.
     """
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: uuid.UUID
     email: EmailStr
@@ -188,14 +188,14 @@ class StudentPublicMe(BaseModel):
 
 class LecturerPublicMe(BaseModel):
     """Specific response for GET /auth/me (Lecturer)."""
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     id: uuid.UUID
     first_name: str
     last_name: str
     email: EmailStr
     roles: list[str]
     staff_id: str | None = None
-    authorized: bool | None = Field(default=None, alias="is_authorized")
+    is_authorized: bool | None = Field(default=None, alias="authorized")
     department: DepartmentNested | None = None
 
 class UpdateMeResponse(BaseModel):
