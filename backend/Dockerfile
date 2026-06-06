@@ -6,9 +6,8 @@
 # ---------------------------------------------------------------------------
 FROM python:3.12 AS builder
 
-# Install uv globally (using a slightly newer version)
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
-
+# Install uv globally via pip to avoid ghcr.io DNS resolution issues
+RUN pip install uv
 # Skip apt-get build-essential as most dependencies have wheels available. 
 # This avoids extremely slow networking bottlenecks during build.
 
@@ -20,14 +19,14 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 WORKDIR /build
 
 # Copy dependency files first to maximize Docker layer caching
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 
 # Install dependencies without installing the project itself (--no-install-project)
-RUN uv sync --locked --no-dev --no-install-project
+RUN uv sync --active --locked --no-dev --no-install-project
 
 # Copy project source and install the project itself
 COPY src/ src/
-RUN uv sync --locked --no-dev
+RUN uv sync --active --locked --no-dev
 
 # ---------------------------------------------------------------------------
 # Stage 2: Runtime
@@ -52,6 +51,7 @@ COPY --chown=appuser:appuser alembic.ini .
 ENV ENVIRONMENT=production
 ENV WEB_CONCURRENCY=4
 ENV PORT=8000
+ENV PYTHONPATH=/home/appuser/app/src
 
 # Gunicorn runs Uvicorn workers. This handles process management properly.
-ENTRYPOINT ["gunicorn", "src.app.main:app", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
+ENTRYPOINT ["gunicorn", "app.main:app", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
