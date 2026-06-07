@@ -34,3 +34,6 @@ htmlcov/
 .mypy_cache/
 
 # Alembic (sometimes people ignore compiled cache, but not needed here)
+
+# Local dev Docker override (machine-specific, not for version control)
+docker-compose.override.yml
