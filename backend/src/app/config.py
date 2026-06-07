@@ -80,11 +80,41 @@ class Settings(BaseSettings):
     WEB_CONCURRENCY: int = 4
 
     # ------------------------------------------------------------------
-    # External Systems (Phase 9)
+    # Object Storage (S3-compatible)
     # ------------------------------------------------------------------
+    # Works with MinIO, AWS S3, Cloudflare R2, Backblaze B2, Wasabi, etc.
+    # Leave STORAGE_ENDPOINT_URL blank to route to real AWS S3.
+    #
+    # Variable             AWS SDK equivalent
+    # ─────────────────────────────────────────────────────────────────
+    # STORAGE_ACCESS_KEY   AWS_ACCESS_KEY_ID
+    # STORAGE_SECRET_KEY   AWS_SECRET_ACCESS_KEY
+    # STORAGE_ENDPOINT_URL endpoint_url kwarg (omit for real AWS S3)
+    # STORAGE_REGION       AWS_DEFAULT_REGION
+    # ─────────────────────────────────────────────────────────────────
+    STORAGE_ENDPOINT_URL: str | None = None
+    STORAGE_ACCESS_KEY: str | None = None
+    STORAGE_SECRET_KEY: str | None = None
+    STORAGE_BUCKET_NAME: str = "ams-storage-bucket"
+    STORAGE_REGION: str = "us-east-1"  # Dummy value is fine for MinIO; required for real AWS
+
+    # Public-facing base URL for object storage — what browsers/clients use to fetch files.
+    # Differs from STORAGE_ENDPOINT_URL when running inside Docker:
+    #   STORAGE_ENDPOINT_URL = http://minio:9000   (server → MinIO, internal Docker hostname)
+    #   STORAGE_PUBLIC_URL   = http://localhost:9000 (browser → MinIO, host-accessible)
+    # Leave blank for AWS S3 / Cloudflare R2 (presigned URLs embed the host automatically).
+    STORAGE_PUBLIC_URL: str | None = None
+
+    # Set to true to serve time-limited presigned download URLs instead of plain public URLs.
+    # Keep false in development (public bucket). Flip to true in production for secure access.
+    STORAGE_PRESIGNED_DOWNLOADS: bool = False
+    STORAGE_PRESIGNED_EXPIRY_SECONDS: int = 3600  # 1 hour
+
+    # Deprecated aliases — kept for one release cycle; will be removed.
+    # Prefer the STORAGE_* names above.
     AWS_ACCESS_KEY_ID: str | None = None
     AWS_SECRET_ACCESS_KEY: str | None = None
-    S3_BUCKET_NAME: str = "ams-storage-bucket"
+    S3_BUCKET_NAME: str | None = None
     S3_ENDPOINT_URL: str | None = None
 
     OPENAI_API_KEY: str | None = None
@@ -181,6 +211,41 @@ class Settings(BaseSettings):
     @property
     def is_local(self) -> bool:
         return self.ENVIRONMENT == Environment.LOCAL
+
+    @property
+    def storage_access_key(self) -> str | None:
+        """Resolve storage access key, preferring the new STORAGE_* name."""
+        return self.STORAGE_ACCESS_KEY or self.AWS_ACCESS_KEY_ID
+
+    @property
+    def storage_secret_key(self) -> str | None:
+        """Resolve storage secret key, preferring the new STORAGE_* name."""
+        return self.STORAGE_SECRET_KEY or self.AWS_SECRET_ACCESS_KEY
+
+    @property
+    def storage_bucket(self) -> str:
+        """Resolve bucket name, preferring the new STORAGE_* name."""
+        return self.S3_BUCKET_NAME or self.STORAGE_BUCKET_NAME
+
+    @property
+    def storage_endpoint_url(self) -> str | None:
+        """Resolve endpoint URL, preferring the new STORAGE_* name."""
+        return self.STORAGE_ENDPOINT_URL or self.S3_ENDPOINT_URL
+
+    @property
+    def storage_public_url(self) -> str | None:
+        """Public-facing base URL for storage (what browsers use to fetch files).
+
+        Falls back to storage_endpoint_url when STORAGE_PUBLIC_URL is not set
+        (fine for cases where the same URL works both server-side and client-side,
+        e.g. AWS S3, Cloudflare R2, or running the app directly on the host).
+        """
+        return self.STORAGE_PUBLIC_URL or self.storage_endpoint_url
+
+    @property
+    def storage_configured(self) -> bool:
+        """True when enough credentials are present to talk to an S3-compatible store."""
+        return bool(self.storage_access_key and self.storage_secret_key)
 
 
 @lru_cache

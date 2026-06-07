@@ -16,6 +16,7 @@ from app.core.redis import redis_pool
 from app.core.arq_pool import init_arq_pool, close_arq_pool
 from app.core.security import get_password_hash
 from app.models.user import User, UserRole
+from app.services.storage import storage_service
 from sqlalchemy import select
 
 if TYPE_CHECKING:
@@ -76,6 +77,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     
     # Seed default admin user
     await seed_admin()
+
+    # Initialise object storage — verify/create bucket
+    await storage_service.ensure_bucket_exists()
 
     # 2. Yield control back to FastAPI to serve requests
     yield

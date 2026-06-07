@@ -106,14 +106,16 @@ async def upload_material(
     visibility: str = Form(...),
     file: UploadFile = File(...),
 ):
-    from app.services.storage import StorageService
     from app.schemas.material import MaterialCreate
+    from app.services.storage import storage_service
 
-    storage_svc = StorageService()
-    # Read and upload file concurrently or synchronously depending on the client
-    file_url = storage_svc.upload_file(file.file, file.filename, file.content_type)
-    
-    payload = MaterialCreate(title=title, type=type, visibility=visibility, file_url=file_url)
+    object_key = await storage_service.upload_file(
+        file.file,
+        file.filename or "upload",
+        file.content_type or "application/octet-stream",
+    )
+
+    payload = MaterialCreate(title=title, type=type, visibility=visibility, file_url=object_key)
     svc = LecturerService(session)
     mat = await svc.create_material(current_user, offering_id, payload)
     return MaterialUploadResponse(message="Uploaded successfully", material=mat)

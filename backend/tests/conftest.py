@@ -17,8 +17,9 @@ from unittest import mock
 from unittest.mock import MagicMock
 import sys
 
-# Mock boto3 to avoid ModuleNotFoundError in environments where it's not installed
-sys.modules["boto3"] = MagicMock()
+# Mock aioboto3 to avoid ModuleNotFoundError in environments where it's not installed
+sys.modules["aioboto3"] = MagicMock()
+sys.modules["aiobotocore"] = MagicMock()
 
 import pytest
 from httpx import ASGITransport, AsyncClient

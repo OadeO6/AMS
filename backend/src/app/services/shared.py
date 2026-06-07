@@ -78,10 +78,5 @@ class SharedService:
         else:
             raise ForbiddenError("Only students and lecturers can access materials")
 
-        from app.services.storage import StorageService
-        svc = StorageService()
-
-        # If it's a full URL (like local mock), return it. Otherwise generate presigned URL.
-        if material.file_url.startswith("http"):
-            return material.file_url
-        return svc.generate_presigned_url(material.file_url)
+        from app.services.storage import storage_service
+        return await storage_service.get_download_url(material.file_url)
