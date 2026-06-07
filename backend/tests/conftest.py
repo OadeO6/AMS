@@ -36,6 +36,9 @@ from app.models.user import User, UserRole
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Generator
 
+# Shared password used by all fixture users.  Change here to change everywhere.
+TEST_PASSWORD = "securepassword123"
+
 # Fail early if the test DB URL is not set
 if not settings.TEST_DATABASE_URL:
     raise RuntimeError("TEST_DATABASE_URL is required to run tests.")
@@ -157,7 +160,7 @@ async def student_user(db_session: AsyncSession) -> User:
         email="student@example.com",
         first_name="Test",
         last_name="Student",
-        hashed_password=get_password_hash("securepassword123"),
+        hashed_password=get_password_hash(TEST_PASSWORD),
         roles=[UserRole.STUDENT.value],
         is_active=True,
         admission_year=2024,
@@ -183,7 +186,7 @@ async def lecturer_user(db_session: AsyncSession) -> User:
         email="lecturer@example.com",
         first_name="Test",
         last_name="Lecturer",
-        hashed_password=get_password_hash("securepassword123"),
+        hashed_password=get_password_hash(TEST_PASSWORD),
         roles=[UserRole.LECTURER.value],
         is_active=True,
         is_authorized=True,
@@ -269,7 +272,7 @@ async def admin_user(db_session: AsyncSession) -> User:
         email="admin@example.com",
         first_name="Admin",
         last_name="User",
-        hashed_password=get_password_hash("securepassword123"),
+        hashed_password=get_password_hash(TEST_PASSWORD),
         roles=[UserRole.ADMIN.value],
         is_active=True,
     )
@@ -292,7 +295,7 @@ async def hod_user(db_session: AsyncSession) -> User:
         email="hod@example.com",
         first_name="HOD",
         last_name="User",
-        hashed_password=get_password_hash("securepassword123"),
+        hashed_password=get_password_hash(TEST_PASSWORD),
         roles=[UserRole.HOD.value, UserRole.LECTURER.value],
         is_active=True,
     )
@@ -315,7 +318,7 @@ async def inactive_user(db_session: AsyncSession) -> User:
         email="inactive@example.com",
         first_name="Inactive",
         last_name="User",
-        hashed_password=get_password_hash("securepassword123"),
+        hashed_password=get_password_hash(TEST_PASSWORD),
         roles=[UserRole.STUDENT.value],
         is_active=False,
     )
@@ -332,7 +335,7 @@ async def test_user(db_session: AsyncSession) -> User:
         email="inactive@example.com",
         first_name="Inactive",
         last_name="User",
-        hashed_password=get_password_hash("securepassword123"),
+        hashed_password=get_password_hash(TEST_PASSWORD),
         roles=[UserRole.STUDENT.value],
         is_active=False,
     )

@@ -2,15 +2,21 @@
 """
 Unit tests for StorageService (app.services.storage).
 
-The external aioboto3 S3 client is fully mocked via AsyncMock — no real
-MinIO / AWS connection is made.  Tests exercise:
+'Unit' here means: the full StorageService object is exercised against an
+AsyncMock S3 client — no real network, no database, no filesystem I/O.
+This is the correct layer for testing async service behaviour, S3 API call
+conventions, and error propagation.
 
-  * upload_file          — happy path, unconfigured stub, S3 error
-  * get_download_url     — public URL mode, presigned URL mode, stub passthrough
-  * _build_public_url    — correct URL construction from config
-  * ensure_bucket_exists — create-on-miss, already-exists, policy application
-  * delete_file          — happy path, stub passthrough
-  * config resolution    — STORAGE_* vs deprecated AWS_* / S3_* fallback
+Fixtures:
+  ``s3_mock``      — AsyncMock representing the S3 client inside the context manager
+  ``make_service`` — factory that injects s3_mock into a real StorageService instance
+
+Covered methods:
+  StorageService.upload_file()
+  StorageService.get_download_url()
+  StorageService._build_public_url()
+  StorageService.ensure_bucket_exists()
+  StorageService.delete_file()
 """
 
 from __future__ import annotations
@@ -18,7 +24,7 @@ from __future__ import annotations
 import io
 import json
 from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from botocore.exceptions import ClientError
@@ -27,321 +33,311 @@ from app.services.storage import StorageService
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers / shared fixtures
 # ---------------------------------------------------------------------------
 
-def _make_client_error(code: str) -> ClientError:
-    """Build a minimal botocore ClientError with the given error code."""
+
+def _client_error(code: str) -> ClientError:
+    """Construct a minimal botocore ClientError with the given error code."""
     return ClientError(
-        error_response={"Error": {"Code": code, "Message": "test error"}},
+        error_response={"Error": {"Code": code, "Message": "test"}},
         operation_name="TestOp",
     )
 
 
-def _make_service(
-    *,
-    configured: bool = True,
-    presigned_downloads: bool = False,
-    endpoint: str = "http://localhost:9000",
-    public_url: str | None = "http://localhost:9000",
-    bucket: str = "test-bucket",
-    region: str = "us-east-1",
-    expiry: int = 3600,
-) -> tuple[StorageService, MagicMock]:
+@pytest.fixture()
+def s3_mock() -> AsyncMock:
+    """A mock S3 client whose methods are all AsyncMocks."""
+    return AsyncMock()
+
+
+@pytest.fixture()
+def make_service(s3_mock: AsyncMock):
+    """Factory: return a real StorageService with its S3 client patched.
+
+    Usage::
+
+        def test_something(make_service, s3_mock):
+            svc = make_service()                  # defaults
+            svc = make_service(presigned=True)    # presigned downloads
+            svc = make_service(configured=False)  # unconfigured storage
     """
-    Return a StorageService with a patched aioboto3 Session whose client is
-    a MagicMock that can be used as an async context manager.
+    def _factory(
+        *,
+        configured: bool = True,
+        presigned: bool = False,
+        endpoint: str = "http://localhost:9000",
+        public_url: str = "http://localhost:9000",
+        bucket: str = "test-bucket",
+        region: str = "us-east-1",
+        expiry: int = 3600,
+    ) -> StorageService:
+        @asynccontextmanager
+        async def _fake_client(*args, **kwargs):
+            yield s3_mock
 
-    Returns (service, mock_s3_client).
-    """
-    mock_s3 = AsyncMock()
+        mock_session = MagicMock()
+        mock_session.client = _fake_client
 
-    @asynccontextmanager
-    async def _fake_client(*args, **kwargs):
-        yield mock_s3
-
-    mock_session = MagicMock()
-    mock_session.client = _fake_client
-
-    with patch("app.services.storage.aioboto3.Session", return_value=mock_session):
-        svc = StorageService.__new__(StorageService)
+        svc = object.__new__(StorageService)
         svc._session = mock_session
         svc._bucket = bucket
         svc._endpoint = endpoint
-        svc._public_url = public_url or endpoint
+        svc._public_url = public_url
         svc._region = region
         svc._access_key = "key" if configured else None
         svc._secret_key = "secret" if configured else None
         svc._configured = configured
-        svc._presigned_downloads = presigned_downloads
+        svc._presigned_downloads = presigned
         svc._presigned_expiry = expiry
+        return svc
 
-    return svc, mock_s3
-
-
-# ---------------------------------------------------------------------------
-# upload_file
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_upload_file_returns_object_key() -> None:
-    """upload_file should call upload_fileobj and return an 'uploads/...' key."""
-    svc, s3 = _make_service()
-
-    file_obj = io.BytesIO(b"dummy pdf bytes")
-    key = await svc.upload_file(file_obj, "lecture.pdf", "application/pdf")
-
-    s3.upload_fileobj.assert_called_once()
-    assert key.startswith("uploads/")
-    assert key.endswith("-lecture.pdf")
-
-
-@pytest.mark.asyncio
-async def test_upload_file_key_does_not_contain_full_url() -> None:
-    """The returned key must be a plain path, never a full HTTP URL."""
-    svc, _ = _make_service()
-
-    key = await svc.upload_file(io.BytesIO(b"x"), "file.pdf", "application/pdf")
-
-    assert not key.startswith("http"), (
-        f"upload_file returned a full URL instead of an object key: {key!r}"
-    )
-
-
-@pytest.mark.asyncio
-async def test_upload_file_unconfigured_returns_stub_key() -> None:
-    """When storage is not configured, a 'local/...' stub key is returned without calling S3."""
-    svc, s3 = _make_service(configured=False)
-
-    key = await svc.upload_file(io.BytesIO(b"x"), "file.pdf")
-
-    assert key.startswith("local/")
-    s3.upload_fileobj.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_upload_file_propagates_s3_error() -> None:
-    """A ClientError from upload_fileobj should be wrapped in AppException (status 500)."""
-    from app.exceptions import AppException
-
-    svc, s3 = _make_service()
-    s3.upload_fileobj.side_effect = _make_client_error("InternalError")
-
-    with pytest.raises(AppException) as exc_info:
-        await svc.upload_file(io.BytesIO(b"x"), "bad.pdf")
-
-    assert exc_info.value.status_code == 500
+    return _factory
 
 
 # ---------------------------------------------------------------------------
-# get_download_url — public mode
+# TestUploadFile
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_get_download_url_public_mode_builds_correct_url() -> None:
-    """In public mode (presigned=False), a plain URL constructed from the public base URL is returned."""
-    svc, _ = _make_service(
-        presigned_downloads=False,
-        public_url="http://localhost:9000",
-        bucket="ams-storage-bucket",
-    )
+class TestUploadFile:
+    """upload_file() uploads a file object and returns an object key (not a URL)."""
 
-    url = await svc.get_download_url("uploads/abc-file.pdf")
+    async def test_happy_path_returns_object_key(self, make_service, s3_mock) -> None:
+        """Successful upload returns an 'uploads/...' object key."""
+        svc = make_service()
+        key = await svc.upload_file(io.BytesIO(b"data"), "report.pdf", "application/pdf")
 
-    assert url == "http://localhost:9000/ams-storage-bucket/uploads/abc-file.pdf"
+        s3_mock.upload_fileobj.assert_called_once()
+        assert key.startswith("uploads/")
+        assert key.endswith("-report.pdf")
 
+    async def test_returned_key_is_never_a_full_url(self, make_service, s3_mock) -> None:
+        """The object key must not start with 'http' — it is a path, not a URL."""
+        svc = make_service()
+        key = await svc.upload_file(io.BytesIO(b"data"), "file.pdf")
 
-@pytest.mark.asyncio
-async def test_get_download_url_public_mode_uses_public_url_not_endpoint() -> None:
-    """Public URL must use STORAGE_PUBLIC_URL, not STORAGE_ENDPOINT_URL (internal Docker host)."""
-    svc, _ = _make_service(
-        presigned_downloads=False,
-        endpoint="http://minio:9000",    # Docker-internal — should NOT appear in output
-        public_url="http://localhost:9000",  # Browser-accessible — MUST appear in output
-        bucket="ams-storage-bucket",
-    )
+        assert not key.startswith("http"), (
+            f"upload_file returned a full URL instead of an object key: {key!r}"
+        )
 
-    url = await svc.get_download_url("uploads/test.pdf")
+    async def test_unconfigured_storage_returns_stub_key(self, make_service, s3_mock) -> None:
+        """When no credentials are set, a 'local/' stub key is returned without S3 I/O."""
+        svc = make_service(configured=False)
+        key = await svc.upload_file(io.BytesIO(b"data"), "file.pdf")
 
-    assert "minio" not in url, "Download URL must not expose the Docker-internal hostname"
-    assert "localhost:9000" in url
+        assert key.startswith("local/")
+        s3_mock.upload_fileobj.assert_not_called()
 
+    async def test_s3_client_error_raises_app_exception(self, make_service, s3_mock) -> None:
+        """An S3 ClientError must be wrapped in AppException (HTTP 500)."""
+        from app.exceptions import AppException
 
-# ---------------------------------------------------------------------------
-# get_download_url — presigned mode
-# ---------------------------------------------------------------------------
+        svc = make_service()
+        s3_mock.upload_fileobj.side_effect = _client_error("InternalError")
 
+        with pytest.raises(AppException) as exc_info:
+            await svc.upload_file(io.BytesIO(b"data"), "bad.pdf")
 
-@pytest.mark.asyncio
-async def test_get_download_url_presigned_mode_calls_generate_presigned_url() -> None:
-    """In presigned mode, get_download_url must delegate to generate_presigned_url."""
-    svc, s3 = _make_service(presigned_downloads=True, expiry=1800)
-    s3.generate_presigned_url.return_value = "https://signed-url.example.com/token"
-
-    url = await svc.get_download_url("uploads/secret.pdf")
-
-    s3.generate_presigned_url.assert_called_once_with(
-        "get_object",
-        Params={"Bucket": "test-bucket", "Key": "uploads/secret.pdf"},
-        ExpiresIn=1800,
-    )
-    assert url == "https://signed-url.example.com/token"
-
-
-@pytest.mark.asyncio
-async def test_get_download_url_stub_key_passthrough() -> None:
-    """A 'local/' stub key should be returned as-is without touching S3."""
-    svc, s3 = _make_service()
-
-    url = await svc.get_download_url("local/uploads/stub.pdf")
-
-    assert url == "local/uploads/stub.pdf"
-    s3.generate_presigned_url.assert_not_called()
+        assert exc_info.value.status_code == 500
 
 
 # ---------------------------------------------------------------------------
-# _build_public_url
+# TestGetDownloadUrl
 # ---------------------------------------------------------------------------
 
 
-def test_build_public_url_strips_trailing_slash() -> None:
-    """_build_public_url must produce a clean URL even if public_url has a trailing slash."""
-    svc, _ = _make_service(public_url="http://localhost:9000/", bucket="my-bucket")
+class TestGetDownloadUrl:
+    """get_download_url() returns the appropriate URL for a given object key."""
 
-    url = svc._build_public_url("uploads/test.pdf")
+    async def test_public_mode_builds_url_from_public_base(self, make_service) -> None:
+        """In public mode (presigned=False), returns a plain URL from the public base URL."""
+        svc = make_service(presigned=False, public_url="http://localhost:9000", bucket="ams-bucket")
+        url = await svc.get_download_url("uploads/abc-file.pdf")
+        assert url == "http://localhost:9000/ams-bucket/uploads/abc-file.pdf"
 
-    assert url == "http://localhost:9000/my-bucket/uploads/test.pdf"
-    assert "//" not in url.replace("http://", "")
+    async def test_public_mode_never_exposes_internal_hostname(self, make_service) -> None:
+        """When STORAGE_ENDPOINT_URL is an internal Docker hostname, it must not leak into URLs."""
+        svc = make_service(
+            presigned=False,
+            endpoint="http://minio:9000",      # internal Docker host
+            public_url="http://localhost:9000",  # browser-accessible
+            bucket="ams-bucket",
+        )
+        url = await svc.get_download_url("uploads/test.pdf")
+        assert "minio" not in url, "Internal Docker hostname must not appear in download URLs"
+        assert "localhost:9000" in url
 
+    async def test_presigned_mode_delegates_to_s3(self, make_service, s3_mock) -> None:
+        """In presigned mode, generate_presigned_url is called with correct parameters."""
+        s3_mock.generate_presigned_url.return_value = "https://signed.example.com/token"
+        svc = make_service(presigned=True, expiry=1800)
 
-def test_build_public_url_falls_back_to_aws_when_no_endpoint() -> None:
-    """When public_url is None, _build_public_url should produce an AWS URL."""
-    svc, _ = _make_service(public_url=None, endpoint=None, region="eu-west-1", bucket="prod-bucket")
-    svc._public_url = None  # Force the fallback path
+        url = await svc.get_download_url("uploads/secret.pdf")
 
-    url = svc._build_public_url("uploads/report.pdf")
+        s3_mock.generate_presigned_url.assert_called_once_with(
+            "get_object",
+            Params={"Bucket": "test-bucket", "Key": "uploads/secret.pdf"},
+            ExpiresIn=1800,
+        )
+        assert url == "https://signed.example.com/token"
 
-    assert "s3.eu-west-1.amazonaws.com" in url
-    assert "prod-bucket" in url
-    assert "uploads/report.pdf" in url
+    async def test_local_stub_key_passthrough(self, make_service, s3_mock) -> None:
+        """A key prefixed with 'local/' is returned unchanged without any S3 call."""
+        svc = make_service()
+        url = await svc.get_download_url("local/uploads/stub.pdf")
+        assert url == "local/uploads/stub.pdf"
+        s3_mock.generate_presigned_url.assert_not_called()
 
-
-# ---------------------------------------------------------------------------
-# ensure_bucket_exists
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_ensure_bucket_exists_creates_bucket_when_missing() -> None:
-    """When head_bucket raises 404, the bucket should be created."""
-    svc, s3 = _make_service()
-    s3.head_bucket.side_effect = _make_client_error("404")
-    s3.put_bucket_policy.return_value = {}
-
-    await svc.ensure_bucket_exists()
-
-    s3.create_bucket.assert_called_once_with(Bucket="test-bucket")
-
-
-@pytest.mark.asyncio
-async def test_ensure_bucket_exists_skips_create_when_already_exists() -> None:
-    """When head_bucket succeeds, create_bucket must not be called."""
-    svc, s3 = _make_service()
-    s3.head_bucket.return_value = {}
-    s3.put_bucket_policy.return_value = {}
-
-    await svc.ensure_bucket_exists()
-
-    s3.create_bucket.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_ensure_bucket_exists_sets_public_policy_in_public_mode() -> None:
-    """In public mode, a public-read bucket policy must be applied via put_bucket_policy."""
-    svc, s3 = _make_service(presigned_downloads=False)
-    s3.head_bucket.return_value = {}
-    s3.put_bucket_policy.return_value = {}
-
-    await svc.ensure_bucket_exists()
-
-    s3.put_bucket_policy.assert_called_once()
-    call_kwargs = s3.put_bucket_policy.call_args
-    policy_str = call_kwargs.kwargs.get("Policy") or call_kwargs.args[1]
-    policy = json.loads(policy_str)
-
-    # Verify the policy grants GetObject to everyone
-    stmt = policy["Statement"][0]
-    assert stmt["Effect"] == "Allow"
-    assert stmt["Action"] == ["s3:GetObject"]
-    assert "*" in str(stmt["Principal"])
-
-
-@pytest.mark.asyncio
-async def test_ensure_bucket_exists_skips_public_policy_in_presigned_mode() -> None:
-    """In presigned mode, put_bucket_policy must not be called (bucket stays private)."""
-    svc, s3 = _make_service(presigned_downloads=True)
-    s3.head_bucket.return_value = {}
-
-    await svc.ensure_bucket_exists()
-
-    s3.put_bucket_policy.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_ensure_bucket_exists_does_not_crash_when_not_configured() -> None:
-    """An unconfigured service should return without calling any S3 APIs."""
-    svc, s3 = _make_service(configured=False)
-
-    # Must not raise
-    await svc.ensure_bucket_exists()
-
-    s3.head_bucket.assert_not_called()
-    s3.create_bucket.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_ensure_bucket_exists_swallows_unexpected_s3_errors() -> None:
-    """Non-404 ClientErrors are caught and logged, not raised (so startup doesn't crash)."""
-    svc, s3 = _make_service()
-    s3.head_bucket.side_effect = _make_client_error("InternalError")
-
-    # Must not raise — errors are logged and swallowed
-    await svc.ensure_bucket_exists()
+    async def test_unconfigured_passthrough(self, make_service, s3_mock) -> None:
+        """When storage is not configured, the key itself is returned as a best-effort."""
+        svc = make_service(configured=False)
+        url = await svc.get_download_url("uploads/some-key.pdf")
+        assert url == "uploads/some-key.pdf"
 
 
 # ---------------------------------------------------------------------------
-# delete_file
+# TestBuildPublicUrl
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_delete_file_calls_s3_delete_object() -> None:
-    """delete_file must call delete_object with the correct bucket and key."""
-    svc, s3 = _make_service()
-    s3.delete_object.return_value = {}
+class TestBuildPublicUrl:
+    """_build_public_url() constructs a plain HTTP download URL from config.
 
-    await svc.delete_file("uploads/old-file.pdf")
+    This is a synchronous pure-function test — no mocking needed.
+    """
 
-    s3.delete_object.assert_called_once_with(Bucket="test-bucket", Key="uploads/old-file.pdf")
+    def test_basic_url_format(self, make_service) -> None:
+        """URL is: <public_base>/<bucket>/<key>."""
+        svc = make_service(public_url="http://localhost:9000", bucket="ams-bucket")
+        url = svc._build_public_url("uploads/abc-file.pdf")
+        assert url == "http://localhost:9000/ams-bucket/uploads/abc-file.pdf"
+
+    def test_trailing_slash_on_base_is_stripped(self, make_service) -> None:
+        """A trailing slash on public_url must not produce a double slash."""
+        svc = make_service(public_url="http://localhost:9000/", bucket="my-bucket")
+        url = svc._build_public_url("uploads/test.pdf")
+        assert url == "http://localhost:9000/my-bucket/uploads/test.pdf"
+        assert "//" not in url.replace("http://", "").replace("https://", "")
+
+    def test_falls_back_to_aws_url_when_no_public_url(self, make_service) -> None:
+        """When public_url is None, produces an AWS S3-style URL using the region."""
+        svc = make_service(public_url="http://localhost:9000", region="eu-west-1", bucket="prod-bucket")
+        svc._public_url = None  # type: ignore[attr-defined]  # force the fallback path
+
+        url = svc._build_public_url("uploads/report.pdf")
+
+        assert "s3.eu-west-1.amazonaws.com" in url
+        assert "prod-bucket" in url
+        assert "uploads/report.pdf" in url
 
 
-@pytest.mark.asyncio
-async def test_delete_file_skips_stub_keys() -> None:
-    """delete_file must be a no-op for 'local/' stub keys."""
-    svc, s3 = _make_service()
-
-    await svc.delete_file("local/uploads/stub.pdf")
-
-    s3.delete_object.assert_not_called()
+# ---------------------------------------------------------------------------
+# TestEnsureBucketExists
+# ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_delete_file_skips_when_not_configured() -> None:
-    """delete_file must be a no-op when storage is not configured."""
-    svc, s3 = _make_service(configured=False)
+class TestEnsureBucketExists:
+    """ensure_bucket_exists() is an idempotent startup helper called by lifespan."""
 
-    await svc.delete_file("uploads/some-file.pdf")
+    async def test_creates_bucket_when_404(self, make_service, s3_mock) -> None:
+        """When head_bucket returns 404 the bucket is created."""
+        svc = make_service()
+        s3_mock.head_bucket.side_effect = _client_error("404")
+        s3_mock.put_bucket_policy.return_value = {}
 
-    s3.delete_object.assert_not_called()
+        await svc.ensure_bucket_exists()
+
+        s3_mock.create_bucket.assert_called_once_with(Bucket="test-bucket")
+
+    async def test_skips_create_when_bucket_already_exists(self, make_service, s3_mock) -> None:
+        """When head_bucket succeeds, create_bucket is never called."""
+        svc = make_service()
+        s3_mock.head_bucket.return_value = {}
+        s3_mock.put_bucket_policy.return_value = {}
+
+        await svc.ensure_bucket_exists()
+
+        s3_mock.create_bucket.assert_not_called()
+
+    async def test_applies_public_read_policy_in_public_mode(self, make_service, s3_mock) -> None:
+        """In public mode, put_bucket_policy is called with a valid public-read statement."""
+        svc = make_service(presigned=False)
+        s3_mock.head_bucket.return_value = {}
+        s3_mock.put_bucket_policy.return_value = {}
+
+        await svc.ensure_bucket_exists()
+
+        s3_mock.put_bucket_policy.assert_called_once()
+        call_kwargs = s3_mock.put_bucket_policy.call_args.kwargs
+        policy = json.loads(call_kwargs["Policy"])
+        stmt = policy["Statement"][0]
+        assert stmt["Effect"] == "Allow"
+        assert stmt["Action"] == ["s3:GetObject"]
+        assert "*" in str(stmt["Principal"])
+
+    async def test_does_not_apply_policy_in_presigned_mode(self, make_service, s3_mock) -> None:
+        """In presigned mode the bucket stays private — no put_bucket_policy call."""
+        svc = make_service(presigned=True)
+        s3_mock.head_bucket.return_value = {}
+
+        await svc.ensure_bucket_exists()
+
+        s3_mock.put_bucket_policy.assert_not_called()
+
+    async def test_no_op_when_not_configured(self, make_service, s3_mock) -> None:
+        """Unconfigured storage logs a warning and returns without touching S3."""
+        svc = make_service(configured=False)
+        await svc.ensure_bucket_exists()
+        s3_mock.head_bucket.assert_not_called()
+
+    async def test_non_404_client_error_is_swallowed(self, make_service, s3_mock) -> None:
+        """Unexpected S3 errors are caught and logged so the application still starts."""
+        svc = make_service()
+        s3_mock.head_bucket.side_effect = _client_error("InternalError")
+        # Must not raise — errors are logged, not propagated
+        await svc.ensure_bucket_exists()
+
+
+# ---------------------------------------------------------------------------
+# TestDeleteFile
+# ---------------------------------------------------------------------------
+
+
+class TestDeleteFile:
+    """delete_file() removes an object from the bucket."""
+
+    async def test_calls_s3_delete_object(self, make_service, s3_mock) -> None:
+        """Deleting a real object key issues a delete_object call."""
+        svc = make_service()
+        s3_mock.delete_object.return_value = {}
+
+        await svc.delete_file("uploads/old-file.pdf")
+
+        s3_mock.delete_object.assert_called_once_with(
+            Bucket="test-bucket", Key="uploads/old-file.pdf"
+        )
+
+    async def test_no_op_for_local_stub_key(self, make_service, s3_mock) -> None:
+        """'local/' prefixed keys are skipped — no S3 call is made."""
+        svc = make_service()
+        await svc.delete_file("local/uploads/stub.pdf")
+        s3_mock.delete_object.assert_not_called()
+
+    async def test_no_op_when_not_configured(self, make_service, s3_mock) -> None:
+        """Unconfigured storage skips the delete silently."""
+        svc = make_service(configured=False)
+        await svc.delete_file("uploads/some-file.pdf")
+        s3_mock.delete_object.assert_not_called()
+
+    async def test_s3_delete_error_raises_app_exception(self, make_service, s3_mock) -> None:
+        """A ClientError during delete is wrapped in AppException (HTTP 500)."""
+        from app.exceptions import AppException
+
+        svc = make_service()
+        s3_mock.delete_object.side_effect = _client_error("InternalError")
+
+        with pytest.raises(AppException) as exc_info:
+            await svc.delete_file("uploads/file.pdf")
+
+        assert exc_info.value.status_code == 500
