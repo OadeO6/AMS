@@ -130,11 +130,16 @@ class AdminService:
         user = await self.users.get_by_id(user_id)
         if not user:
             raise NotFoundError("User not found")
+            
+        update_data = {"department_id": dept.id}
         if UserRole.HOD.value not in user.roles:
-            raise ConflictError("User must have HOD role to be assigned as Head of Department")
+            # Automatically grant the HOD role if they don't have it
+            new_roles = list(user.roles)
+            new_roles.append(UserRole.HOD.value)
+            update_data["roles"] = new_roles
 
         # Set user's department explicitly as well, so their token matches the HOD scoping.
-        await self.users.update(user, department_id=dept.id)
+        await self.users.update(user, **update_data)
         return await self.departments.update(dept, hod_id=user.id)
 
     # ---------------------------------------------------------------------------
