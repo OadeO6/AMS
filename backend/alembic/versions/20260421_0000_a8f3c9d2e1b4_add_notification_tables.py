@@ -24,6 +24,9 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # notifications
     # ------------------------------------------------------------------
+    # Drop existing notifications table from initial schema
+    op.drop_table("notifications")
+    
     op.create_table(
         "notifications",
         sa.Column(
