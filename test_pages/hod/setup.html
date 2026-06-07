@@ -79,6 +79,41 @@
                         <pre id="offering-out" class="output"></pre>
                     </div>
                 </div>
+
+                <!-- 3 — Assign Additional Lecturers -->
+                <div class="section">
+                    <h3>3 — Assign/Unassign Lecturers</h3>
+                    <p class="subtitle">Assign additional lecturers to an existing course offering.</p>
+                    
+                    <div class="section-box">
+                        <div class="field">
+                            <label>Select Course</label>
+                            <div class="row row-auto">
+                                <select id="assign-course-sel" style="flex:1" onchange="loadOfferingsForAssign()"><option value="">— Load courses first —</option></select>
+                            </div>
+                        </div>
+
+                        <div class="field" style="margin-top:12px">
+                            <label>Select Course Offering</label>
+                            <div class="row row-auto">
+                                <select id="assign-offering-sel" style="flex:1"><option value="">— Select a course first —</option></select>
+                            </div>
+                        </div>
+
+                        <div class="field" style="margin-top:12px">
+                            <label>Select Lecturer</label>
+                            <div class="row row-auto">
+                                <select id="assign-lec-sel" style="flex:1"><option value="">— Load lecturers first —</option></select>
+                            </div>
+                        </div>
+
+                        <div class="row row-2" style="margin-top:12px">
+                            <button class="btn" id="btn-assign-lecturer">Assign Lecturer</button>
+                            <button class="btn btn-ghost" id="btn-unassign-lecturer">Unassign Lecturer</button>
+                        </div>
+                        <pre id="assign-out" class="output"></pre>
+                    </div>
+                </div>
             </div>
         </section>
     </main>
@@ -121,11 +156,14 @@
 
         async function loadCourses() {
             const sel = document.getElementById('course-sel');
+            const assignSel = document.getElementById('assign-course-sel');
             sel.innerHTML = '<option value="">— Loading... —</option>';
+            assignSel.innerHTML = '<option value="">— Loading... —</option>';
             try {
                 const res = await api.get('/hod/courses');
                 if (!res.courses || res.courses.length === 0) {
                     sel.innerHTML = '<option value="">— No course definitions found. Create one above! —</option>';
+                    assignSel.innerHTML = '<option value="">— No course definitions found. Create one above! —</option>';
                     return;
                 }
                 let opts = '<option value="">— Select a course definition —</option>';
@@ -133,14 +171,18 @@
                     opts += `<option value="${c.id}">${c.title} (${c.code})</option>`;
                 }
                 sel.innerHTML = opts;
+                assignSel.innerHTML = opts;
             } catch (e) {
                 sel.innerHTML = '<option value="">— Error loading —</option>';
+                assignSel.innerHTML = '<option value="">— Error loading —</option>';
             }
         }
 
         async function loadLecturers() {
             const sel = document.getElementById('lec-sel');
+            const assignSel = document.getElementById('assign-lec-sel');
             sel.innerHTML = '<option value="">— Loading... —</option>';
+            assignSel.innerHTML = '<option value="">— Loading... —</option>';
             try {
                 const res = await api.get('/hod/lecturers');
                 let opts = '<option value="">— Select a lecturer —</option>';
@@ -148,8 +190,10 @@
                     opts += `<option value="${l.id}">${l.first_name} ${l.last_name} (${l.email})</option>`;
                 }
                 sel.innerHTML = opts;
+                assignSel.innerHTML = opts;
             } catch (e) {
                 sel.innerHTML = '<option value="">— Error loading —</option>';
+                assignSel.innerHTML = '<option value="">— Error loading —</option>';
             }
         }
 
@@ -157,22 +201,10 @@
             const sel = document.getElementById('sem-sel');
             sel.innerHTML = '<option value="">— Loading... —</option>';
             
-            // To fetch semesters, we need admin token if the route is protected
-            const savedRoles = auth.getSavedRoles();
-            const admin = savedRoles.find(r => r.role === 'admin');
-            
-            if (!admin) {
-                sel.innerHTML = '<option value="">— Admin login required to fetch semesters —</option>';
-                return;
-            }
-
             try {
-                // Manually inject admin auth header just for this fetch
-                const res = await fetch(api.baseUrl + '/admin/academic-sessions', {
-                    headers: { 'Authorization': 'Bearer ' + admin.access_token }
-                });
-                if (!res.ok) throw new Error('Failed to fetch semesters');
-                const data = await res.json();
+                const res = await api.get('/academic-sessions');
+                if (!res.sessions) throw new Error('Failed to fetch semesters');
+                const data = res;
                 
                 let opts = '<option value="">— Select an active semester —</option>';
                 for (const sess of data.sessions) {
@@ -200,8 +232,72 @@
                 const res = await api.post(`/hod/courses/${courseId}/offerings`, body);
                 setOutput('offering-out', res);
                 showToast('Course offering created', 'success');
+                loadOfferingsForAssign(); // Refresh offerings list if the assigned course is selected
             } catch (e) {
                 setOutput('offering-out', e.data || e.message, true);
+            }
+        });
+
+        // ── Assign/Unassign Lecturers ──
+        async function loadOfferingsForAssign() {
+            const courseId = document.getElementById('assign-course-sel').value;
+            const sel = document.getElementById('assign-offering-sel');
+            if (!courseId) {
+                sel.innerHTML = '<option value="">— Select a course first —</option>';
+                return;
+            }
+            sel.innerHTML = '<option value="">— Loading offerings... —</option>';
+            try {
+                const res = await api.get(`/hod/courses/${courseId}/offerings`);
+                if (!res || res.length === 0) {
+                    sel.innerHTML = '<option value="">— No offerings found for this course —</option>';
+                    return;
+                }
+                let opts = '<option value="">— Select an offering —</option>';
+                for (const o of res) {
+                    opts += `<option value="${o.id}">Offering ID: ${o.id.split('-')[0]}... (Semester ID: ${o.semester_id.split('-')[0]}...)</option>`;
+                }
+                sel.innerHTML = opts;
+            } catch (e) {
+                sel.innerHTML = '<option value="">— Error loading offerings —</option>';
+            }
+        }
+
+        document.getElementById('btn-assign-lecturer').addEventListener('click', async () => {
+            const courseId = document.getElementById('assign-course-sel').value;
+            const offeringId = document.getElementById('assign-offering-sel').value;
+            const lecturerId = document.getElementById('assign-lec-sel').value;
+
+            if (!courseId || !offeringId || !lecturerId) {
+                setOutput('assign-out', 'Select a course, an offering, and a lecturer first', true);
+                return;
+            }
+
+            try {
+                const res = await api.post(`/hod/courses/${courseId}/offerings/${offeringId}/assign`, { lecturer_id: lecturerId });
+                setOutput('assign-out', res);
+                showToast('Lecturer assigned to offering', 'success');
+            } catch (e) {
+                setOutput('assign-out', e.data || e.message, true);
+            }
+        });
+
+        document.getElementById('btn-unassign-lecturer').addEventListener('click', async () => {
+            const courseId = document.getElementById('assign-course-sel').value;
+            const offeringId = document.getElementById('assign-offering-sel').value;
+            const lecturerId = document.getElementById('assign-lec-sel').value;
+
+            if (!courseId || !offeringId || !lecturerId) {
+                setOutput('assign-out', 'Select a course, an offering, and a lecturer first', true);
+                return;
+            }
+
+            try {
+                const res = await api.delete(`/hod/courses/${courseId}/offerings/${offeringId}/assign/${lecturerId}`);
+                setOutput('assign-out', res);
+                showToast('Lecturer unassigned from offering', 'success');
+            } catch (e) {
+                setOutput('assign-out', e.data || e.message, true);
             }
         });
     </script>

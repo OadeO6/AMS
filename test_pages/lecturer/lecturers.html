@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — Lecturers Directory</title>
+    <link rel="stylesheet" href="../shared/style.css">
+    <style>
+        .list-item {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px;
+            margin-bottom: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .list-item-meta { font-size: 0.8rem; color: var(--text-dim); }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <header class="old-header" style="display:none"><span class="current">Lecturers Directory</span></header>
+
+    <main>
+        <section class="page-content" id="content">
+            <a href="index.html" class="back-link">← Back to Lecturer Console</a>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>👥 Lecturers Directory</h1>
+                    <p class="subtitle">Public directory of all lecturers and self-signup portal.</p>
+                </div>
+                <button class="btn btn-sm" onclick="toggleRegisterForm()">+ Add New Lecturer</button>
+            </div>
+
+            <!-- Auth Warning -->
+            <div id="auth-warn" class="alert warn hidden">
+                You must log in as an Authorized Lecturer to use this directory.
+            </div>
+
+            <div id="lecturer-content" class="hidden">
+                <!-- Create Lecturer Form -->
+                <div id="register-section" class="hidden section-box" style="margin-bottom: 24px; border-color: var(--accent);">
+                    <h3>Register New Lecturer</h3>
+                    <div class="row row-2">
+                        <div class="field">
+                            <label>First Name</label>
+                            <input type="text" id="reg-fname" spellcheck="false" required>
+                        </div>
+                        <div class="field">
+                            <label>Last Name</label>
+                            <input type="text" id="reg-lname" spellcheck="false" required>
+                        </div>
+                    </div>
+                    <div class="row row-2">
+                        <div class="field">
+                            <label>Email</label>
+                            <input type="email" id="reg-email" spellcheck="false" required>
+                        </div>
+                        <div class="field">
+                            <label>Password</label>
+                            <input type="password" id="reg-password" required minlength="8">
+                        </div>
+                    </div>
+                    <div class="row row-2">
+                        <div class="field">
+                            <label>Staff ID</label>
+                            <input type="text" id="reg-staff-id" spellcheck="false" placeholder="e.g. STF-001" required>
+                        </div>
+                        <div class="field">
+                            <label>Phone (optional)</label>
+                            <input type="text" id="reg-phone" spellcheck="false">
+                        </div>
+                    </div>
+                    
+                    <div class="row row-auto" style="margin-top: 16px;">
+                        <button id="btn-register" class="btn" onclick="registerLecturer()">Create Lecturer</button>
+                        <button class="btn btn-ghost" onclick="toggleRegisterForm()">Cancel</button>
+                    </div>
+                    <pre id="reg-out" class="output hidden"></pre>
+                </div>
+
+                <!-- Lecturers List -->
+                <div class="section">
+                    <div class="row row-auto" style="margin-bottom:12px">
+                        <button class="btn btn-sm btn-ghost" onclick="loadLecturers()">↻ Refresh List</button>
+                    </div>
+                    <div id="lecturer-list" class="empty">
+                        <p>Loading lecturers...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="../shared/layout.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/auth.js"></script>
+    <script>
+        function checkAuth() {
+            const a = auth.getActiveRole();
+            const isLecturer = a && a.role === 'lecturer';
+            document.getElementById('auth-warn').classList.toggle('hidden', isLecturer);
+            document.getElementById('lecturer-content').classList.toggle('hidden', !isLecturer);
+            if (isLecturer) loadLecturers();
+        }
+        
+        window.addEventListener('roleChanged', checkAuth);
+        if (auth.getActiveRole()) checkAuth();
+
+        function toggleRegisterForm() {
+            const sec = document.getElementById('register-section');
+            sec.classList.toggle('hidden');
+        }
+
+        async function loadLecturers() {
+            const list = document.getElementById('lecturer-list');
+            list.innerHTML = '<p>Loading...</p>';
+            list.className = '';
+            
+            try {
+                // Shared endpoint requiring authentication
+                const res = await api.get('/users?role=lecturer&limit=100');
+                if (!res.users || res.users.length === 0) {
+                    list.innerHTML = '<p>No lecturers found in the system.</p>';
+                    list.className = 'empty';
+                    return;
+                }
+
+                let html = '';
+                for (const u of res.users) {
+                    html += `
+                        <div class="list-item">
+                            <div style="font-weight:600">${u.first_name} ${u.last_name}</div>
+                            <div class="list-item-meta">
+                                Email: ${u.email}
+                            </div>
+                        </div>
+                    `;
+                }
+                list.innerHTML = html;
+            } catch (e) {
+                list.innerHTML = `<p style="color:var(--red)">Error: ${e.data ? e.data.detail || e.message : e.message}</p>`;
+            }
+        }
+
+        async function registerLecturer() {
+            const btn = document.getElementById('btn-register');
+            const out = document.getElementById('reg-out');
+
+            const payload = {
+                first_name: document.getElementById('reg-fname').value.trim(),
+                last_name: document.getElementById('reg-lname').value.trim(),
+                email: document.getElementById('reg-email').value.trim(),
+                password: document.getElementById('reg-password').value,
+                staff_id: document.getElementById('reg-staff-id').value.trim(),
+                phone: document.getElementById('reg-phone').value.trim() || undefined
+            };
+
+            if (!payload.first_name || !payload.last_name || !payload.email || !payload.password || !payload.staff_id) {
+                return alert('Please fill in all required fields.');
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+            out.classList.add('hidden');
+
+            try {
+                const res = await api.post('/auth/register/lecturer', payload);
+                out.classList.remove('hidden');
+                
+                // Clear form
+                document.getElementById('reg-fname').value = '';
+                document.getElementById('reg-lname').value = '';
+                document.getElementById('reg-email').value = '';
+                document.getElementById('reg-password').value = '';
+                document.getElementById('reg-staff-id').value = '';
+                document.getElementById('reg-phone').value = '';
+                
+                // We got tokens back, meaning the lecturer was created successfully.
+                // We will just show a success message and reload the list.
+                // Note: We are NOT logging the user in here because they might be an Admin 
+                // or another user creating the lecturer.
+                out.className = 'output success';
+                out.textContent = `✓ Lecturer ${payload.first_name} ${payload.last_name} successfully registered!\nThey must be authorized by an Admin before they can log in and use the system.`;
+                
+                loadLecturers();
+            } catch (e) {
+                out.classList.remove('hidden');
+                out.className = 'output error';
+                out.textContent = 'ERROR:\n' + JSON.stringify(e.data || e.message, null, 2);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Create Lecturer';
+            }
+        }
+
+        // Initialize
+        loadLecturers();
+    </script>
+</body>
+</html>

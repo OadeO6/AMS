@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — Department Lecturers</title>
+    <link rel="stylesheet" href="../shared/style.css">
+    <style>
+        .list-item {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px;
+            margin-bottom: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .list-item-meta { font-size: 0.8rem; color: var(--text-dim); }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <header class="old-header" style="display:none"><span class="current">Department Lecturers</span></header>
+
+    <main>
+        <section class="page-content" id="content">
+            <a href="index.html" class="back-link">← Back to HOD Console</a>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>👥 Department Lecturers</h1>
+                    <p class="subtitle">View all lecturers assigned to your department.</p>
+                </div>
+            </div>
+
+            <!-- Auth Warning -->
+            <div id="auth-warn" class="alert warn hidden">
+                You must log in as an HOD to view this directory.
+            </div>
+
+            <div id="hod-content" class="hidden">
+                <div class="section">
+                    <div class="row row-auto" style="margin-bottom:12px">
+                        <button class="btn btn-sm btn-ghost" onclick="loadLecturers()">↻ Refresh List</button>
+                    </div>
+                    <div id="lecturer-list" class="empty">
+                        <p>Loading lecturers...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="../shared/layout.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/auth.js"></script>
+    <script>
+        function checkAuth() {
+            const a = auth.getActiveRole();
+            const isHod = a && a.role === 'hod';
+            document.getElementById('auth-warn').classList.toggle('hidden', isHod);
+            document.getElementById('hod-content').classList.toggle('hidden', !isHod);
+            if (isHod) loadLecturers();
+        }
+        
+        window.addEventListener('roleChanged', checkAuth);
+        if (auth.getActiveRole()) checkAuth();
+
+        async function loadLecturers() {
+            const list = document.getElementById('lecturer-list');
+            list.innerHTML = '<p>Loading...</p>';
+            list.className = '';
+            
+            try {
+                const res = await api.get('/hod/lecturers?limit=100');
+                if (!res.users || res.users.length === 0) {
+                    list.innerHTML = '<p>No lecturers found in your department.</p>';
+                    list.className = 'empty';
+                    return;
+                }
+
+                let html = '';
+                for (const u of res.users) {
+                    html += `
+                        <div class="list-item">
+                            <div style="font-weight:600">${u.first_name} ${u.last_name}</div>
+                            <div class="list-item-meta">
+                                Email: ${u.email}
+                                <br>Roles: ${u.roles.join(', ')}
+                            </div>
+                        </div>
+                    `;
+                }
+                list.innerHTML = html;
+            } catch (e) {
+                list.innerHTML = `<p style="color:var(--red)">Error: ${e.data ? e.data.detail || e.message : e.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

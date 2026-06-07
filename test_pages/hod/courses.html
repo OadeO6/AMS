@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS — Course Explorer</title>
+    <link rel="stylesheet" href="../shared/style.css">
+    <style>
+        .split-layout { display: flex; gap: 24px; align-items: flex-start; }
+        .list-pane { flex: 1; max-width: 300px; display: flex; flex-direction: column; gap: 12px; }
+        .detail-pane { flex: 2; display: flex; flex-direction: column; gap: 24px; }
+        
+        .course-item {
+            padding: 12px; background: var(--surface1); border: 1px solid var(--border);
+            border-radius: 8px; cursor: pointer; transition: all 0.2s;
+        }
+        .course-item:hover { border-color: var(--accent); background: var(--surface2); }
+        .course-item.active { border-color: var(--accent); border-width: 2px; }
+        .course-title { font-weight: 600; margin-bottom: 4px; }
+        .course-meta { font-size: 0.85rem; color: var(--text-dim); }
+
+        .offering-card {
+            padding: 16px; background: var(--surface1); border: 1px solid var(--border);
+            border-radius: 8px; margin-bottom: 12px; cursor: pointer;
+        }
+        .offering-card:hover { border-color: var(--accent); }
+        .offering-card.active { border-color: var(--accent); border-width: 2px; }
+        
+        .nested-list { margin-top: 12px; padding: 12px; background: var(--surface0); border-radius: 6px; }
+        .empty-state { padding: 32px; text-align: center; color: var(--text-dim); border: 1px dashed var(--border); border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <header class="old-header" style="display:none"><span class="current">Course Explorer</span></header>
+
+    <main>
+        <section class="page-content" id="content">
+            <a href="index.html" class="back-link">← Back to HOD Console</a>
+            <h1>🔍 Course Explorer</h1>
+            <p class="subtitle">View and manage courses and their semester offerings.</p>
+
+            <div id="auth-warn" class="alert warn hidden">
+                You must log in as an HOD to use this page.
+            </div>
+
+            <div id="hod-content" class="hidden">
+                <div class="split-layout">
+                    <!-- Left: Course List -->
+                    <div class="list-pane">
+                        <h3>Courses</h3>
+                        <div id="course-list">
+                            <div class="empty-state">Loading courses...</div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Detail View -->
+                    <div class="detail-pane" id="detail-pane" style="display: none;">
+                        
+                        <!-- Course Info Card -->
+                        <div class="card" id="course-detail-card">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div>
+                                    <h2 id="det-title">Course Title</h2>
+                                    <div class="mono" id="det-code" style="color: var(--accent); margin-bottom: 8px;">CODE101</div>
+                                </div>
+                                <div class="badge" id="det-units">3 Units</div>
+                            </div>
+                            <p id="det-desc" style="color: var(--text-dim); font-size: 0.9rem; margin-top: 12px;"></p>
+                            
+                            <hr style="margin: 16px 0;">
+                            <div class="row row-auto">
+                                <button class="btn btn-sm btn-ghost" onclick="promptEditCourse()">Edit Course</button>
+                                <button class="btn btn-sm btn-ghost" onclick="deleteCourse()" style="color: #ff6b6b">Delete Course</button>
+                            </div>
+                        </div>
+
+                        <!-- Offerings List -->
+                        <div class="card" id="offerings-container">
+                            <h3>Semester Offerings</h3>
+                            <div id="offerings-list" style="margin-top: 12px;"></div>
+                        </div>
+
+                        <!-- Deep Offering Detail -->
+                        <div class="card hidden" id="offering-deep-detail">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h3>Offering Details</h3>
+                                <button class="btn btn-sm btn-ghost" onclick="document.getElementById('offering-deep-detail').classList.add('hidden')">✕ Close</button>
+                            </div>
+                            
+                            <div class="kv" style="margin-top: 16px;"><span>Session</span><span id="off-session"></span></div>
+                            <div class="kv"><span>Semester</span><span id="off-semester"></span></div>
+                            <div class="kv"><span>Status</span><span id="off-status"></span></div>
+                            <div class="kv"><span>Total Students</span><span id="off-students"></span></div>
+                            
+                            <h4 style="margin-top: 24px; margin-bottom: 8px;">Assigned Lecturers</h4>
+                            <div id="off-lecturers" class="nested-list"></div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modals / Forms -->
+    <dialog id="edit-modal" style="padding: 24px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface0); color: var(--text); max-width: 400px; width: 100%;">
+        <h3 style="margin-top: 0;">Edit Course</h3>
+        <div class="field" style="margin-top: 16px;">
+            <label>Title</label>
+            <input type="text" id="edit-title">
+        </div>
+        <div class="field">
+            <label>Description</label>
+            <textarea id="edit-desc" rows="3"></textarea>
+        </div>
+        <div class="row row-2" style="margin-top: 24px;">
+            <button class="btn" onclick="saveCourseEdit()">Save</button>
+            <button class="btn btn-ghost" onclick="document.getElementById('edit-modal').close()">Cancel</button>
+        </div>
+    </dialog>
+
+    <script src="../shared/layout.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/auth.js"></script>
+    <script>
+        let currentCourseId = null;
+        let currentOfferingId = null;
+
+        function checkAuth() {
+            const a = auth.getActiveRole();
+            const isHod = a && a.role === 'hod';
+            document.getElementById('auth-warn').classList.toggle('hidden', isHod);
+            document.getElementById('hod-content').classList.toggle('hidden', !isHod);
+            if (isHod) {
+                loadCourseList();
+            }
+        }
+        
+        window.addEventListener('roleChanged', checkAuth);
+        if (auth.getActiveRole()) checkAuth();
+
+        async function loadCourseList() {
+            const listEl = document.getElementById('course-list');
+            listEl.innerHTML = '<div class="empty-state">Loading...</div>';
+            try {
+                const res = await api.get('/hod/courses');
+                if (!res.courses || res.courses.length === 0) {
+                    listEl.innerHTML = '<div class="empty-state">No courses found.<br><a href="setup.html" style="color:var(--accent)">Create one here</a></div>';
+                    return;
+                }
+                
+                let html = '';
+                for (const c of res.courses) {
+                    html += `
+                        <div class="course-item" id="citem-${c.id}" onclick="selectCourse('${c.id}')">
+                            <div class="course-title">${c.code}</div>
+                            <div class="course-meta">${c.title} • ${c.units} Units</div>
+                        </div>
+                    `;
+                }
+                listEl.innerHTML = html;
+            } catch (e) {
+                listEl.innerHTML = '<div class="empty-state">Error loading courses</div>';
+            }
+        }
+
+        async function selectCourse(id) {
+            // Highlight active
+            document.querySelectorAll('.course-item').forEach(el => el.classList.remove('active'));
+            const item = document.getElementById(`citem-${id}`);
+            if (item) item.classList.add('active');
+
+            currentCourseId = id;
+            document.getElementById('detail-pane').style.display = 'flex';
+            document.getElementById('offering-deep-detail').classList.add('hidden');
+            
+            // Load Course Detail
+            try {
+                const c = await api.get(`/hod/courses/${id}`);
+                document.getElementById('det-title').textContent = c.title;
+                document.getElementById('det-code').textContent = c.code;
+                document.getElementById('det-units').textContent = c.units + ' Units';
+                document.getElementById('det-desc').textContent = c.description || 'No description provided.';
+                
+                // Set edit modal values
+                document.getElementById('edit-title').value = c.title;
+                document.getElementById('edit-desc').value = c.description || '';
+
+                renderOfferings(c.offerings);
+            } catch (e) {
+                showToast('Error loading course details', 'error');
+            }
+        }
+
+        function renderOfferings(offerings) {
+            const listEl = document.getElementById('offerings-list');
+            if (!offerings || offerings.length === 0) {
+                listEl.innerHTML = '<div class="empty-state" style="padding:16px">No offerings for this course.</div>';
+                return;
+            }
+            
+            let html = '';
+            for (const o of offerings) {
+                html += `
+                    <div class="offering-card" id="oitem-${o.id}" onclick="selectOffering('${o.id}')">
+                        <div style="display:flex; justify-content:space-between; align-items:center">
+                            <span style="font-weight:600">${o.academic_session} — ${o.semester} Semester</span>
+                            ${o.is_active ? '<span class="badge" style="background:var(--success);color:#000">Active</span>' : '<span class="badge">Inactive</span>'}
+                        </div>
+                        <div class="course-meta" style="margin-top:8px">
+                            Lecturers: ${o.lecturers.length}
+                        </div>
+                    </div>
+                `;
+            }
+            listEl.innerHTML = html;
+        }
+
+        async function selectOffering(id) {
+            document.querySelectorAll('.offering-card').forEach(el => el.classList.remove('active'));
+            const item = document.getElementById(`oitem-${id}`);
+            if (item) item.classList.add('active');
+
+            currentOfferingId = id;
+            const deepEl = document.getElementById('offering-deep-detail');
+            deepEl.classList.remove('hidden');
+            
+            deepEl.style.opacity = '0.5'; // Loading state
+            try {
+                const o = await api.get(`/hod/courses/${currentCourseId}/offerings/${id}`);
+                
+                document.getElementById('off-session').textContent = o.academic_session;
+                document.getElementById('off-semester').textContent = o.semester;
+                document.getElementById('off-status').innerHTML = o.is_active ? '<span style="color:var(--success)">Active</span>' : 'Inactive';
+                document.getElementById('off-students').textContent = o.total_students || 0;
+                
+                const lecEl = document.getElementById('off-lecturers');
+                if (o.lecturers && o.lecturers.length > 0) {
+                    lecEl.innerHTML = o.lecturers.map(l => `<div>• ${l.name || l.first_name + ' ' + l.last_name}</div>`).join('');
+                } else {
+                    lecEl.innerHTML = '<span style="color:var(--text-dim)">No lecturers assigned.</span>';
+                }
+            } catch (e) {
+                showToast('Error loading offering details', 'error');
+            } finally {
+                deepEl.style.opacity = '1';
+            }
+        }
+
+        function promptEditCourse() {
+            document.getElementById('edit-modal').showModal();
+        }
+
+        async function saveCourseEdit() {
+            const body = {
+                title: document.getElementById('edit-title').value,
+                description: document.getElementById('edit-desc').value
+            };
+            try {
+                await api.patch(`/hod/courses/${currentCourseId}`, body);
+                showToast('Course updated', 'success');
+                document.getElementById('edit-modal').close();
+                selectCourse(currentCourseId);
+                loadCourseList();
+            } catch (e) {
+                showToast('Error updating course', 'error');
+            }
+        }
+
+        async function deleteCourse() {
+            if (!confirm('Are you sure you want to delete this course definition? This will fail if there are active offerings.')) return;
+            try {
+                await api.delete(`/hod/courses/${currentCourseId}`);
+                showToast('Course deleted', 'success');
+                document.getElementById('detail-pane').style.display = 'none';
+                loadCourseList();
+            } catch (e) {
+                showToast(e.data?.detail || 'Error deleting course', 'error');
+            }
+        }
+    </script>
+</body>
+</html>
