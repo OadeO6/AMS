@@ -48,7 +48,7 @@ _NOT_IMPLEMENTED = JSONResponse(
 # ---------------------------------------------------------------------------
 
 @router.get("/courses", response_model=CourseListResponse)
-async def list_available_courses(
+async def list_available_offerings(
     current_user: AuthorizedStudent,
     session: DBSession,
     department: str | None = Query(None),
