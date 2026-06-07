@@ -95,7 +95,7 @@ offeringId          FK → CourseOffering
 uploadedBy          FK → User
 title
 type                enum: note | slide | resource
-fileUrl
+fileUrl             string (stores object key, not full URL)
 visibility          enum: students_only | ai_only | both
 indexed             bool (default: false)
 indexedAt           nullable
@@ -111,7 +111,7 @@ title
 description         nullable
 dueDate
 aiGrading           bool (default: false)
-markingGuideUrl     nullable
+markingGuideUrl     string | null (stores object key)
 createdAt
 ```
 
@@ -143,7 +143,7 @@ submissionId        FK → Submission
 questionId          FK → Question
 selectedOption      string | null   (mcq)
 textAnswer          string | null   (free_text)
-fileUrl             string | null   (document_upload)
+fileUrl             string | null   (stores object key)
 score               number | null
 feedback            string | null
 ```

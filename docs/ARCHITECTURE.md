@@ -43,7 +43,7 @@ Core features: course management, task/grading, attendance, AI tutoring, analyti
 | Cache / Sessions | Redis 7 via redis-py async | Refresh token storage, future caching |
 | Auth | JWT (access, 15 min) + opaque UUID in Redis (refresh, 7 days) | Stateless access + instant refresh invalidation |
 | Package Manager | `uv` — `pyproject.toml` + `uv.lock` | Fast, modern Python package management |
-| File Storage | TBD | — |
+| File Storage | MinIO / AWS S3 via `aioboto3` | Async, provider-agnostic, supports presigned URLs |
 | AI Provider | TBD | For tutoring + grading |
 | Vector DB | TBD | For RAG/material indexing |
 | Hosting | TBD | — |

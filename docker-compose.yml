@@ -10,20 +10,16 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    # Load all settings from the .env file as the single source of truth.
+    # Only override variables whose values differ inside Docker
+    # (i.e. internal service hostnames instead of localhost).
+    env_file:
+      - ./backend/.env
     environment:
-      # In local compose, override production defaults to use local config
-      - ENVIRONMENT=local
-      - DEBUG=true
-      # Depend on other services
+      # Internal Docker hostnames — these differ from the localhost values in .env
       - DATABASE_URL=postgresql+asyncpg://ams_user:ams_pass@postgres:5432/ams_db
       - REDIS_URL=redis://redis:6379/0
-      # Required secrets 
-      - SECRET_KEY=local-dev-secret-key-replace-in-prod
-      # Storage
-      - AWS_ACCESS_KEY_ID=ams_minio_user
-      - AWS_SECRET_ACCESS_KEY=ams_minio_pass
-      - S3_BUCKET_NAME=ams-storage-bucket
-      - S3_ENDPOINT_URL=http://minio:9000
+      - STORAGE_ENDPOINT_URL=http://minio:9000
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,18 +89,6 @@ services:
       timeout: 5s
       retries: 5
 
-  minio-createbucket:
-    image: minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      /usr/bin/mc alias set myminio http://minio:9000 ams_minio_user ams_minio_pass;
-      /usr/bin/mc mb myminio/ams-storage-bucket || true;
-      /usr/bin/mc policy set public myminio/ams-storage-bucket || true;
-      exit 0;
-      "
 
 volumes:
   postgres_data:
