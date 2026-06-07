@@ -25,6 +25,7 @@ One entry per meaningful change — no prose, just facts.
 
 | Date | File(s) | Change |
 |------|---------|--------|
+| 2026-06-07 | `ENDPOINTS.md`, `ENDPOINTS_DETAIL.md` | Added shared endpoints for academic sessions, faculties, and departments |
 | 2026-04-17 | `ENDPOINTS.md` | Phase 8 — Marked Student/Lecturer Analytics and AI Tutor endpoints as `[x]` implemented |
 | 2026-04-16 | `ENDPOINTS.md` | Phase 7 — Marked remaining Shared/HOD/Auth endpoints as `[x]` implemented |
 | 2026-04-16 | `ENDPOINTS.md` | Phase 6 — Marked all Student academic endpoints as `[x]` implemented |

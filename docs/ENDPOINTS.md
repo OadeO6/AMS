@@ -248,5 +248,9 @@
 [x] PATCH  /notifications/read-all
 [x] POST   /notifications/device-tokens
 [x] DELETE /notifications/device-tokens/:token
+[x] GET    /users                                 ?role ?department ?search ?is_active ?is_authorized ?admission_session ?level_offset
+[x] GET    /academic-sessions
+[x] GET    /faculties
+[x] GET    /faculties/:facultyId/departments
 ```
 → See: [`ENDPOINTS_DETAIL.md` — Shared](./ENDPOINTS_DETAIL.md#shared)

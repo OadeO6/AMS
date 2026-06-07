@@ -2432,3 +2432,97 @@ Note: Deleting a task will also permanently delete all associated student submis
 
 **Response:** `204 No Content`
 </details>
+
+<details>
+<summary><strong>GET /users</strong> — List shared users</summary>
+
+**Query Parameters (optional):**  
+`role` (string), `department` (UUID), `search` (string), `is_active` (boolean), `is_authorized` (boolean), `admission_session` (string), `level_offset` (integer), `page` (integer), `limit` (integer)
+
+**Response:**
+```json
+{
+  "users": [
+    {
+      "id": "string",
+      "first_name": "string",
+      "last_name": "string",
+      "roles": ["string"],
+      "email": "string",
+      "department": { "id": "string", "name": "string" } | null,
+      "avatar": "string" | null
+    }
+  ],
+  "pagination": {
+    "page": 0,
+    "limit": 0,
+    "total": 0
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /academic-sessions</strong> — Get all academic sessions</summary>
+
+**Response:**
+```json
+{
+  "sessions": [
+    {
+      "id": "string",
+      "name": "string",
+      "created_at": "datetime",
+      "semesters": [
+        {
+          "id": "string",
+          "name": "string",
+          "start_date": "datetime",
+          "end_date": "datetime",
+          "is_active": true
+        }
+      ]
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /faculties</strong> — View all faculties</summary>
+
+**Response:**
+```json
+{
+  "faculties": [
+    {
+      "id": "string",
+      "name": "string",
+      "code": "string",
+      "total_departments": 0
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /faculties/{faculty_id}/departments</strong> — View all departments in a faculty</summary>
+
+**Path Parameters:** `faculty_id`
+
+**Response:**
+```json
+{
+  "departments": [
+    {
+      "id": "string",
+      "name": "string",
+      "code": "string",
+      "hod": { "id": "string", "name": "string" } | null,
+      "total_courses": 0
+    }
+  ]
+}
+```
+</details>
