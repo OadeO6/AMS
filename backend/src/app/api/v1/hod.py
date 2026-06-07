@@ -176,8 +176,18 @@ async def list_courses(
     limit: int = Query(20, ge=1, le=100)
 ):
     svc = CourseService(session)
-    total, courses = await svc.list_department_courses(hod=current_user, page=page, limit=limit)
-    courses_data = [CourseDefinitionListItem(id=c.id, title=c.title, code=c.code, units=c.units) for c in courses]
+    total, courses_with_stats = await svc.list_department_courses(hod=current_user, page=page, limit=limit)
+    courses_data = [
+        CourseDefinitionListItem(
+            id=c.id, 
+            title=c.title, 
+            code=c.code, 
+            units=c.units,
+            total_offerings=total_offerings,
+            active_offering=active_offering
+        ) 
+        for c, total_offerings, active_offering in courses_with_stats
+    ]
     return {
         "courses": courses_data,
         "pagination": {"page": page, "limit": limit, "total": total}

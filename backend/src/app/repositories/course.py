@@ -23,16 +23,28 @@ class CourseRepository(BaseRepository[Course]):
         query = select(Course).where(Course.code == code)
         return await self._session.scalar(query)
 
-    async def list_by_department(self, department_id: uuid.UUID, page: int = 1, limit: int = 20) -> tuple[int, Sequence[Course]]:
-        """List all course definitions for a given department with pagination."""
+    async def list_by_department(self, department_id: uuid.UUID, page: int = 1, limit: int = 20) -> tuple[int, list[tuple[Course, int, bool]]]:
+        """List all course definitions for a given department with pagination and offering stats."""
         from sqlalchemy import func
+        from app.models.course import CourseOffering
+
         count_query = select(func.count(Course.id)).where(Course.department_id == department_id)
         total = await self._session.scalar(count_query) or 0
         
-        query = select(Course).where(Course.department_id == department_id).order_by(Course.code)
+        query = (
+            select(
+                Course,
+                func.count(CourseOffering.id).label("total_offerings"),
+                func.coalesce(func.bool_or(CourseOffering.is_active), False).label("active_offering"),
+            )
+            .outerjoin(CourseOffering, Course.id == CourseOffering.course_id)
+            .where(Course.department_id == department_id)
+            .group_by(Course.id)
+            .order_by(Course.code)
+        )
         query = query.offset((page - 1) * limit).limit(limit)
-        result = await self._session.scalars(query)
-        return total, result.all()
+        result = await self._session.execute(query)
+        return total, list(result.all())
 
     async def get_with_offerings(self, course_id: uuid.UUID) -> Course | None:
         """Fetch a course definition along with its offerings."""
@@ -78,6 +90,16 @@ class CourseOfferingRepository(BaseRepository[CourseOffering]):
         query = select(CourseOffering).where(CourseOffering.semester_id == semester_id)
         result = await self._session.scalars(query)
         return result.all()
+
+    async def list_by_course_with_detail(self, course_id: uuid.UUID) -> Sequence[CourseOffering]:
+        """List all offerings for a specific course with their semester and session details."""
+        from sqlalchemy.orm import joinedload
+        from app.models.academic_session import Semester
+        query = select(CourseOffering).where(CourseOffering.course_id == course_id).options(
+            joinedload(CourseOffering.semester).joinedload(Semester.academic_session)
+        )
+        result = await self._session.scalars(query)
+        return result.unique().all()
 
 
 

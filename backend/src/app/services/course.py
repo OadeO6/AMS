@@ -72,8 +72,8 @@ class CourseService:
             "department": {"id": str(dept.id), "name": dept.name} if dept else {"id": str(hod.department_id), "name": ""}
         }
 
-    async def list_department_courses(self, hod: User, page: int = 1, limit: int = 20) -> tuple[int, Sequence[Course]]:
-        """List all courses for the HOD's department."""
+    async def list_department_courses(self, hod: User, page: int = 1, limit: int = 20) -> tuple[int, list[tuple[Course, int, bool]]]:
+        """List all courses for the HOD's department with offering stats."""
         if not hod.department_id:
             return 0, []
         return await self.course_repo.list_by_department(hod.department_id, page=page, limit=limit)
@@ -91,12 +91,14 @@ class CourseService:
         """Fetch course details formatted for the HOD API."""
         course = await self.get_department_course(hod, course_id)
         
+        offerings = await self.offering_repo.list_by_course_with_detail(course_id)
+        
         offerings_data = []
-        for off in getattr(course, "offerings", []):
+        for off in offerings:
             academic_session_name = ""
             semester_name = ""
             if hasattr(off, "semester") and off.semester:
-                if off.semester.academic_session:
+                if getattr(off.semester, "academic_session", None):
                     academic_session_name = off.semester.academic_session.name
                 semester_name = off.semester.name
             
