@@ -57,11 +57,7 @@
         <div class="section hidden" id="step-materials">
             <h3>2 — Materials</h3>
 
-            <!-- Role-specific note -->
-            <div id="lecturer-note" class="alert info hidden">
-                ⚠ <strong>Missing endpoint:</strong> There is no <code>GET /lecturer/courses/:id/materials</code> endpoint.
-                Listing uses the <strong>student</strong> endpoint. Switch to a student role to see materials, or upload below and track via the response.
-            </div>
+            <!-- Role-specific note removed as endpoint now exists -->
 
             <!-- Filter -->
             <div class="selector">
@@ -289,7 +285,6 @@
             // Show upload only for lecturers
             const isLecturer = a && a.role === 'lecturer';
             document.getElementById('step-upload').classList.toggle('hidden', !isLecturer);
-            document.getElementById('lecturer-note').classList.toggle('hidden', !isLecturer);
         }
 
         // ══════════════════════════════════════════════════
@@ -307,7 +302,12 @@
 
             try {
                 const q = typeFilter ? { type: typeFilter } : undefined;
-                const data = await api.get(`/student/courses/${selectedCourseId}/materials`, q);
+                const role = auth.getActiveRole()?.role;
+                const endpoint = role === 'lecturer' 
+                    ? `/lecturer/courses/${selectedCourseId}/materials` 
+                    : `/student/courses/${selectedCourseId}/materials`;
+                
+                const data = await api.get(endpoint, q);
                 materials = data.materials || [];
 
                 if (!materials.length) {

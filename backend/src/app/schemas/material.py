@@ -62,3 +62,7 @@ class MaterialIndexResponse(BaseModel):
 
 class StudentMaterialListResponse(BaseModel):
     materials: list[MaterialResponse]
+
+class LecturerMaterialListResponse(BaseModel):
+    materials: list[MaterialResponse]
+

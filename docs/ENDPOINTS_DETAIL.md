@@ -761,6 +761,32 @@ For a concise route-list overview, see `ENDPOINTS.md`.
 </details>
 
 <details>
+<summary><strong>GET /lecturer/courses/{offering_id}/materials</strong> — View all materials for a course</summary>
+
+**Path Parameters:** `offering_id`
+
+**Response:**
+```json
+{
+  "materials": [
+    {
+      "id": "string",
+      "offering_id": "string",
+      "uploaded_by": "string",
+      "title": "string",
+      "type": "string",
+      "file_url": "string",
+      "visibility": "string",
+      "indexed": true,
+      "indexed_at": "datetime",
+      "created_at": "datetime"
+    }
+  ]
+}
+```
+</details>
+
+<details>
 <summary><strong>POST /lecturer/courses/{offering_id}/materials</strong> — Upload course material</summary>
 
 **Path Parameters:** `offering_id`  

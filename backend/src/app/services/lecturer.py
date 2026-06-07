@@ -224,6 +224,9 @@ class LecturerService:
     # Materials
     # -----------------------------------------------------------------------
 
+    async def list_materials(self, lecturer: User, offering_id: uuid.UUID) -> Sequence[Material]:
+        return await self.material_repo.list_by_offering(offering_id)
+
     async def create_material(
         self, lecturer: User, offering_id: uuid.UUID, payload: MaterialCreate
     ) -> Material:

@@ -17,7 +17,7 @@ from app.middleware.auth import require_authorized_lecturer
 from app.schemas.auth import MessageResponse
 from app.schemas.announcement import AnnouncementCreate, AnnouncementResponse, AnnouncementUpdate, AnnouncementCreateResponse, AnnouncementListResponse
 from app.schemas.gradebook import GradebookEntryResponse, GradebookListResponse, GradebookUpdateRequest
-from app.schemas.material import MaterialUpdate, MaterialUploadResponse, MaterialUpdateResponse, MaterialIndexResponse
+from app.schemas.material import MaterialUpdate, MaterialUploadResponse, MaterialUpdateResponse, MaterialIndexResponse, LecturerMaterialListResponse
 
 from app.schemas.session import (
     AttendanceMarkRequest, ClassSessionCreate, ClassSessionResponse, ClassSessionUpdate,
@@ -89,6 +89,18 @@ async def approve_student(
 # ---------------------------------------------------------------------------
 # Materials
 # ---------------------------------------------------------------------------
+
+
+@router.get("/courses/{offering_id}/materials", response_model=LecturerMaterialListResponse)
+async def list_materials(
+    offering_id: uuid.UUID,
+    current_user: AuthorizedLecturer,
+    session: DBSession,
+):
+    svc = LecturerService(session)
+    materials = await svc.list_materials(current_user, offering_id)
+    from app.schemas.material import MaterialResponse
+    return {"materials": [MaterialResponse.model_validate(m) for m in materials]}
 
 
 @router.post(
