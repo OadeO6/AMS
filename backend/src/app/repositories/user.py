@@ -55,8 +55,13 @@ class UserRepository(BaseRepository[User]):
         self,
         *,
         role: str | None = None,
+        roles_in: list[str] | None = None,
         department_id: uuid.UUID | None = None,
         search: str | None = None,
+        is_active: bool | None = None,
+        is_authorized: bool | None = None,
+        admission_session: str | None = None,
+        level_offset: int | None = None,
         skip: int = 0,
         limit: int = 20,
     ) -> tuple[int, list[User]]:
@@ -71,9 +76,24 @@ class UserRepository(BaseRepository[User]):
             # NOTE: need review
             stmt = stmt.where(User.roles.contains([role]))
             count_stmt = count_stmt.where(User.roles.contains([role]))
+        if roles_in:
+            stmt = stmt.where(User.roles.overlap(roles_in))
+            count_stmt = count_stmt.where(User.roles.overlap(roles_in))
         if department_id:
             stmt = stmt.where(User.department_id == department_id)
             count_stmt = count_stmt.where(User.department_id == department_id)
+        if is_active is not None:
+            stmt = stmt.where(User.is_active == is_active)
+            count_stmt = count_stmt.where(User.is_active == is_active)
+        if is_authorized is not None:
+            stmt = stmt.where(User.is_authorized == is_authorized)
+            count_stmt = count_stmt.where(User.is_authorized == is_authorized)
+        if admission_session:
+            stmt = stmt.where(User.admission_session == admission_session)
+            count_stmt = count_stmt.where(User.admission_session == admission_session)
+        if level_offset is not None:
+            stmt = stmt.where(User.level_offset == level_offset)
+            count_stmt = count_stmt.where(User.level_offset == level_offset)
         if search:
             search_filter = or_(
                 User.first_name.ilike(f"%{search}%"),

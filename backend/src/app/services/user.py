@@ -196,8 +196,13 @@ class UserService:
         self,
         *,
         role: UserRole | None = None,
+        roles_in: list[str] | None = None,
         department_id: uuid.UUID | None = None,
         search: str | None = None,
+        is_active: bool | None = None,
+        is_authorized: bool | None = None,
+        admission_session: str | None = None,
+        level_offset: int | None = None,
         page: int = 1,
         limit: int = 20,
     ) -> tuple[int, list[User]]:
@@ -205,8 +210,13 @@ class UserService:
         skip = max(0, page - 1) * limit
         return await self.repo.list_users(
             role=role.value if role else None,
+            roles_in=roles_in,
             department_id=department_id,
             search=search,
+            is_active=is_active,
+            is_authorized=is_authorized,
+            admission_session=admission_session,
+            level_offset=level_offset,
             skip=skip,
             limit=limit,
         )

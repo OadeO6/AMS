@@ -81,3 +81,44 @@ async def test_shared_material_download(async_client: AsyncClient, get_auth_head
     # Lecturer download AI only -> 200
     resp3 = await async_client.get(f"/api/v1/materials/{m2.id}/download", headers=lecturer_headers)
     assert resp3.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_shared_users_list(async_client: AsyncClient, get_auth_headers, setup_lecturer_data, db_session: AsyncSession):
+    student_user = setup_lecturer_data["student"]
+    lecturer_user = setup_lecturer_data["lecturer"]
+    student_headers = await get_auth_headers(student_user.email, "securepassword123")
+    
+    # Create an admin user to verify filtering logic
+    from app.repositories.user import UserRepository
+    from app.models.user import UserRole
+    from app.core.security import get_password_hash
+    repo = UserRepository(db_session)
+    admin = await repo.create(
+        email="admin_shared_test@example.com",
+        hashed_password=get_password_hash("securepassword123"),
+        first_name="Admin",
+        last_name="Test",
+        roles=[UserRole.ADMIN.value],
+        is_active=True
+    )
+    await db_session.commit()
+
+    # Student requests shared users
+    resp = await async_client.get("/api/v1/users", headers=student_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    users = data["users"]
+    
+    # Admin should not be visible to student
+    assert any(u["email"] == student_user.email for u in users)
+    assert any(u["email"] == lecturer_user.email for u in users)
+    assert not any(u["email"] == admin.email for u in users)
+
+    # Filter by role
+    resp = await async_client.get("/api/v1/users?role=lecturer", headers=student_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["users"]) >= 1
+    assert all("lecturer" in u["roles"] for u in data["users"])
+

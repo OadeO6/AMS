@@ -173,6 +173,25 @@ class UserListResponse(BaseModel):
     pagination: UserPagination
 
 
+class UserSharedPublic(BaseModel):
+    """Minimal user information for shared endpoints."""
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: uuid.UUID
+    first_name: str
+    last_name: str
+    roles: list[str]
+    email: EmailStr
+    department: DepartmentPublic | None = None
+    avatar: str | None = None
+
+
+class UserSharedListResponse(BaseModel):
+    """Paginated list of shared users."""
+    users: list[UserSharedPublic]
+    pagination: UserPagination
+
+
 class StudentPublicMe(BaseModel):
     """Specific response for GET /auth/me (Student)."""
     model_config = ConfigDict(from_attributes=True)
