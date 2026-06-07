@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # ---------------------------------------------------------------------------
 # Course Definition Schemas
@@ -55,23 +55,22 @@ class CourseOfferingCreate(BaseModel):
     lecturer_id: uuid.UUID | None = None
 
 
-class OfferingLecturerNested(BaseModel):
-    """Minimal shape for a lecturer row in CourseOfferingResponse."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID  # This is the offering_lecturer row's offering_id (the lecturer's user id)
-    lecturer_id: uuid.UUID
-
-
 class CourseOfferingResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     course_id: uuid.UUID
     semester_id: uuid.UUID
-    lecturers: list[OfferingLecturerNested] = []
+    lecturers: list[uuid.UUID] = []
     is_active: bool
+
+    @field_validator("lecturers", mode="before")
+    def extract_lecturer_ids(cls, v):
+        if not v:
+            return []
+        if hasattr(v[0], "lecturer_id"):
+            return [assignment.lecturer_id for assignment in v]
+        return v
 
 
 class CourseOfferingAssignLecturer(BaseModel):
