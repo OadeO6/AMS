@@ -58,6 +58,7 @@ const Layout = {
                     <div class="kv"><span>Role</span><span id="session-role" class="mono badge">—</span></div>
                     <div class="kv"><span>Dept</span><span id="session-dept" class="mono">—</span></div>
                     <div class="kv"><span>ID</span><span id="session-id" class="mono truncate">—</span></div>
+                    <div class="kv"><span>Token</span><input type="text" id="session-token" readonly style="font-size:0.7rem; padding:2px 4px; border:1px solid var(--border); border-radius:4px; width:100px; background:var(--surface1); color:var(--text); cursor:copy;" onclick="this.select(); document.execCommand('copy'); showToast('Token copied', 'success');" title="Click to copy"></div>
                     <button id="btn-logout" class="btn btn-sm btn-ghost" style="width:100%;margin-top:4px">Logout</button>
                 </section>
             </aside>

@@ -27,7 +27,7 @@ const auth = {
     setActiveRole(r)  { localStorage.setItem(this.ACTIVE_KEY, JSON.stringify(r)); },
     clearActiveRole() { localStorage.removeItem(this.ACTIVE_KEY); },
 
-    async login(email, password, label) {
+    async login(email, password, label, expectedRole) {
         const data = await api.post('/auth/login', { email, password });
         // Temporarily set token to fetch /me
         const tmp = { access_token: data.access_token };
@@ -37,12 +37,26 @@ const auth = {
         try { user = await api.get('/auth/me'); }
         catch (e) { this.clearActiveRole(); throw e; }
 
+        let primaryRole = 'unknown';
+        if (user.roles && user.roles.length > 0) {
+            if (expectedRole && user.roles.includes(expectedRole)) {
+                primaryRole = expectedRole;
+            } else if (user.roles.includes('admin')) {
+                primaryRole = 'admin';
+            } else if (user.roles.includes('hod')) {
+                primaryRole = 'hod';
+            } else {
+                primaryRole = user.roles[0];
+            }
+        }
+
         const role = {
             label: label || `${user.first_name} ${user.last_name}`,
-            email, role: user.roles ? user.roles[0] : 'unknown', user_id: user.id,
+            email, role: primaryRole, user_id: user.id,
             first_name: user.first_name, last_name: user.last_name,
             access_token: data.access_token, refresh_token: data.refresh_token,
             department: user.department,
+            all_roles: user.roles
         };
 
         const roles = this.getSavedRoles().filter(r => r.email !== email);
@@ -90,6 +104,7 @@ const auth = {
                 <div class="ri-info">
                     <div class="ri-label">${r.label}</div>
                     <div class="ri-email">${r.email}</div>
+                    <div style="margin-top:4px"><input type="text" readonly value="${r.access_token || ''}" style="font-size:0.65rem; padding:2px 4px; border:1px solid var(--border); border-radius:3px; width:90px; background:var(--surface1); color:var(--text-dim); cursor:copy;" onclick="event.stopPropagation(); this.select(); document.execCommand('copy'); showToast('Token copied', 'success');" title="Click to copy token"></div>
                 </div>
                 <div class="ri-right">
                     <span class="badge ${r.role}">${r.role}</span>
@@ -123,6 +138,8 @@ const auth = {
         el('session-id').textContent = a.user_id;
         if (a.department) el('session-dept').textContent = a.department.name || '—';
         else el('session-dept').textContent = '—';
+        const t = el('session-token');
+        if (t) t.value = a.access_token || '';
     },
 
     /* ── Render: header badge on sub-pages ── */
@@ -163,7 +180,7 @@ const auth = {
                 if (!u) return;
                 el.style.opacity = '.4';
                 try {
-                    await auth.login(u.email, u.password, u.label);
+                    await auth.login(u.email, u.password, u.label, u.expectedRole);
                     auth.renderRoleList();
                     auth.renderSessionCard();
                     auth.renderHeaderBadge();

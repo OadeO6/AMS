@@ -171,6 +171,95 @@
                     "department_id": "{{department_id}}"
                 },
                 "ignore_409": true
+            },
+            {
+                "name": "7. Login as HOD to get Token",
+                "endpoint": "/auth/login",
+                "method": "POST",
+                "body": {
+                    "email": "hod@ams.edu",
+                    "password": "TestPass123!"
+                },
+                "extract": "hod_temp_token = response.access_token"
+            },
+            {
+                "name": "8. Get HOD User ID",
+                "endpoint": "/auth/me",
+                "method": "GET",
+                "auth_token_var": "hod_temp_token",
+                "extract": "hod_user_id = response.id"
+            },
+            {
+                "name": "9. Authorize Lecturer (Admin)",
+                "endpoint": "/admin/staff/authorize",
+                "method": "POST",
+                "auth_token_var": "admin_token",
+                "body": {
+                    "user_ids": ["{{hod_user_id}}"]
+                }
+            },
+            {
+                "name": "10. Assign HOD Role (Admin)",
+                "endpoint": "/admin/departments/{{department_id}}/hod",
+                "method": "POST",
+                "auth_token_var": "admin_token",
+                "body": {
+                    "user_id": "{{hod_user_id}}"
+                }
+            },
+            {
+                "name": "11. Re-Login as HOD (Now with HOD Role)",
+                "endpoint": "/auth/login",
+                "method": "POST",
+                "body": {
+                    "email": "hod@ams.edu",
+                    "password": "TestPass123!"
+                },
+                "extract": "hod_token = response.access_token"
+            },
+            {
+                "name": "12. Create Course",
+                "endpoint": "/hod/courses",
+                "method": "POST",
+                "auth_token_var": "hod_token",
+                "body": {
+                    "title": "Introduction to Programming",
+                    "code": "CPE101",
+                    "description": "Basic programming concepts",
+                    "units": 3
+                },
+                "extract": "course_id = response.course.id",
+                "fallback_get": "/hod/courses",
+                "fallback_match": "code=CPE101",
+                "fallback_extract_list": "courses"
+            },
+            {
+                "name": "13. Create Academic Session",
+                "endpoint": "/admin/academic-sessions",
+                "method": "POST",
+                "auth_token_var": "admin_token",
+                "body": {
+                    "name": "2025/2026",
+                    "semesters": [
+                        {
+                            "name": "first",
+                            "start_date": "2024-09-01",
+                            "end_date": "2025-01-31",
+                            "is_active": true
+                        }
+                    ]
+                },
+                "extract": "semester_id = response.session.semesters.0.id"
+            },
+            {
+                "name": "14. Create Course Offering",
+                "endpoint": "/hod/courses/{{course_id}}/offerings",
+                "method": "POST",
+                "auth_token_var": "hod_token",
+                "body": {
+                    "semester_id": "{{semester_id}}",
+                    "lecturer_id": "{{hod_user_id}}"
+                }
             }
         ];
 
@@ -178,12 +267,8 @@
         const outContainer = document.getElementById('seed-output');
 
         function loadJSON() {
-            const saved = localStorage.getItem('ams_seed_data');
-            if (saved) {
-                editor.value = saved;
-            } else {
-                editor.value = JSON.stringify(DEFAULT_SEED_DATA, null, 4);
-            }
+            // Ignore localStorage to ensure updates to the file are always loaded
+            editor.value = JSON.stringify(DEFAULT_SEED_DATA, null, 4);
         }
 
         document.getElementById('btn-reset').addEventListener('click', () => {
@@ -243,11 +328,14 @@
                     url = url.replace(`{{${k}}}`, v);
                 }
 
-                let bodyStr = JSON.stringify(step.body);
-                for (const [k, v] of Object.entries(vars)) {
-                    bodyStr = bodyStr.replace(new RegExp(`{{${k}}}`, 'g'), v);
+                let body = undefined;
+                if (step.body) {
+                    let bodyStr = JSON.stringify(step.body);
+                    for (const [k, v] of Object.entries(vars)) {
+                        bodyStr = bodyStr.replace(new RegExp(`{{${k}}}`, 'g'), v);
+                    }
+                    body = JSON.parse(bodyStr);
                 }
-                const body = JSON.parse(bodyStr);
 
                 let headers = { 'Content-Type': 'application/json' };
                 if (step.auth_token_var && vars[step.auth_token_var]) {
@@ -258,7 +346,7 @@
                     const res = await fetch(api.baseUrl + url, {
                         method: step.method,
                         headers: headers,
-                        body: JSON.stringify(body)
+                        body: body ? JSON.stringify(body) : undefined
                     });
 
                     let data;
