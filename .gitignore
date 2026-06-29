@@ -37,3 +37,4 @@ htmlcov/
 
 # Local dev Docker override (machine-specific, not for version control)
 docker-compose.override.yml
+frontend/node_modules/
