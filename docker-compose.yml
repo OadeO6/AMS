@@ -28,7 +28,7 @@ services:
       minio:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/healthz || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/healthz || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -100,7 +100,7 @@ services:
         - VITE_API_URL=http://localhost:8000
         - VITE_TRPC_URL=http://localhost:8000/api/trpc
     ports:
-      - "3000:80"
+      - "8080:80"
     depends_on:
       - api
 
