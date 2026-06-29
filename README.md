@@ -271,16 +271,24 @@ pnpm preview
 
 You can run the entire stack (PostgreSQL, Redis, MinIO, Backend API, and Frontend) via Docker Compose.
 
-From the root directory:
+You can launch the stack using the provided startup script, which will bring up all containers in the background and print a dashboard with the access URLs directly to your console:
 
 ```bash
-docker compose up --build
+./start.sh
 ```
 
-- **Frontend**: Available at `http://localhost:3000` (mapped to port 80/nginx in production mode, or port 3000 in dev mode via `docker-compose.override.yml`)
+Alternatively, run from the root directory:
+
+```bash
+docker compose up
+```
+
+- **Frontend (Dev)**: Available at `http://localhost:3000` (mapped to port 3000 in dev mode via `docker-compose.override.yml`)
+- **Frontend (Prod)**: Available at `http://localhost:8080` (mapped to port 80/nginx in production mode)
 - **Backend API**: Available at `http://localhost:8000`
 - **Swagger UI**: Available at `http://localhost:8000/docs`
 - **MinIO Console**: Available at `http://localhost:9001`
+
 
 
 ### Health Checks
