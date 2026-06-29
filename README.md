@@ -283,6 +283,13 @@ Alternatively, run from the root directory:
 docker compose up
 ```
 
+To print a quick info dashboard containing all active service access URLs at any time, run:
+
+```bash
+docker compose up info
+```
+
+
 - **Frontend (Dev)**: Available at `http://localhost:3000` (mapped to port 3000 in dev mode via `docker-compose.override.yml`)
 - **Frontend (Prod)**: Available at `http://localhost:8080` (mapped to port 80/nginx in production mode)
 - **Backend API**: Available at `http://localhost:8000`
