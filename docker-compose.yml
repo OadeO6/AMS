@@ -89,6 +89,21 @@ services:
       timeout: 5s
       retries: 5
 
+  # ---------------------------------------------------------------------------
+  # Frontend
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:8000
+        - VITE_TRPC_URL=http://localhost:8000/api/trpc
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
 
 volumes:
   postgres_data:

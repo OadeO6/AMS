@@ -65,7 +65,8 @@ The system integrates AI tutoring grounded in course materials, automatic task g
 - [uv](https://github.com/astral-sh/uv) (Python package manager)
 - Docker & Docker Compose (recommended for local backing services)
 - A Google Gemini API key (required for AI Tutor and Automatic Grading features)
-- Node.js (for the React frontend : see the frontend repository)
+- Node.js 20+ & pnpm (for the React frontend in the `frontend/` directory)
+
 
 ---
 
@@ -102,7 +103,19 @@ The system integrates AI tutoring grounded in course materials, automatic task g
 
 ### Frontend
 
-The frontend is built with **React**. See the frontend repository for setup and development instructions.
+The frontend is a React application configured with Vite and pnpm.
+
+| Layer | Technology |
+|---|---|
+| Framework | React 19 + TypeScript |
+| Build Tool | Vite 7 |
+| Package Manager | `pnpm` |
+| Styling | Tailwind CSS 4 |
+| API Layer | Axios + tRPC React Client (react-query) |
+| Routing | Wouter |
+| Validation | React Hook Form + Zod |
+| UI Components | Radix UI + Lucide React + Framer Motion |
+
 
 ---
 
@@ -188,6 +201,19 @@ uv run uvicorn app.main:app --reload --port 8000
 The API will be available at `http://localhost:8000`.
 Interactive API docs are at `http://localhost:8000/docs`.
 
+### 6. Install frontend dependencies and start frontend dev server
+
+Open a new terminal, navigate to the `frontend/` directory, install packages using `pnpm`, and run the development server:
+
+```bash
+cd frontend
+pnpm install
+pnpm dev
+```
+
+The frontend will be available locally at `http://localhost:5173` (or `http://localhost:3000` when running through Docker Compose).
+
+
 ---
 
 ## Environment Variables
@@ -212,25 +238,50 @@ The application is configured via a single `.env` file located in the `backend/`
 
 ### Development
 
+Start both the backend API and frontend dev server:
+
+**Backend API:**
 ```bash
 cd backend
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
+**Frontend Dev Server:**
+```bash
+cd frontend
+pnpm dev
+```
+
 ### Production
 
+**Backend API:**
 ```bash
 cd backend
 gunicorn app.main:app -k uvicorn.workers.UvicornWorker --workers 4 --bind 0.0.0.0:8000
 ```
 
+**Frontend (Local Preview):**
+```bash
+cd frontend
+pnpm build
+pnpm preview
+```
+
 ### Docker
+
+You can run the entire stack (PostgreSQL, Redis, MinIO, Backend API, and Frontend) via Docker Compose.
 
 From the root directory:
 
 ```bash
 docker compose up --build
 ```
+
+- **Frontend**: Available at `http://localhost:3000` (mapped to port 80/nginx in production mode, or port 3000 in dev mode via `docker-compose.override.yml`)
+- **Backend API**: Available at `http://localhost:8000`
+- **Swagger UI**: Available at `http://localhost:8000/docs`
+- **MinIO Console**: Available at `http://localhost:9001`
+
 
 ### Health Checks
 
