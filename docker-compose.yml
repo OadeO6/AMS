@@ -9,7 +9,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     # Load all settings from the .env file as the single source of truth.
     # Only override variables whose values differ inside Docker
     # (i.e. internal service hostnames instead of localhost).
@@ -76,7 +76,7 @@ services:
     image: minio/minio:latest
     ports:
       - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_PORT:-9001}:9001"
     environment:
       - MINIO_ROOT_USER=ams_minio_user
       - MINIO_ROOT_PASSWORD=ams_minio_pass
@@ -100,9 +100,20 @@ services:
         - VITE_API_URL=http://localhost:8000
         - VITE_TRPC_URL=http://localhost:8000/api/trpc
     ports:
-      - "8080:80"
+      - "${FRONTEND_PROD_PORT:-8080}:80"
     depends_on:
       - api
+
+  # ---------------------------------------------------------------------------
+  # Static Test Pages
+  # ---------------------------------------------------------------------------
+  test-pages:
+    image: nginx:alpine
+    container_name: ams-test-pages
+    volumes:
+      - ./test_pages:/usr/share/nginx/html:ro
+    ports:
+      - "${TEST_PAGES_PORT:-8081}:80"
 
   # ---------------------------------------------------------------------------
   # Service Info / Access Links
@@ -110,6 +121,12 @@ services:
   info:
     image: redis:7-alpine
     container_name: ams-info
+    environment:
+      - API_PORT=${API_PORT:-8000}
+      - FRONTEND_DEV_PORT=${FRONTEND_DEV_PORT:-3000}
+      - FRONTEND_PROD_PORT=${FRONTEND_PROD_PORT:-8080}
+      - MINIO_PORT=${MINIO_PORT:-9001}
+      - TEST_PAGES_PORT=${TEST_PAGES_PORT:-8081}
     entrypoint:
       - sh
       - -c
@@ -118,15 +135,17 @@ services:
         echo "   🚀 Academic Management System (AMS) Stack is Up and Running!"
         echo "=================================================================="
         echo "   🔗 Services available on your host machine:"
-        echo "   • Frontend (Dev Mode)    : http://localhost:3000"
-        echo "   • Frontend (Nginx Prod)  : http://localhost:8080"
-        echo "   • Backend REST API       : http://localhost:8000"
-        echo "   • Swagger API Docs       : http://localhost:8000/docs"
-        echo "   • MinIO Admin Console    : http://localhost:9001"
+        echo "   • Frontend (Dev Mode)    : http://localhost:$$FRONTEND_DEV_PORT"
+        echo "   • Frontend (Nginx Prod)  : http://localhost:$$FRONTEND_PROD_PORT"
+        echo "   • Backend REST API       : http://localhost:$$API_PORT"
+        echo "   • Swagger API Docs       : http://localhost:$$API_PORT/docs"
+        echo "   • MinIO Admin Console    : http://localhost:$$MINIO_PORT"
+        echo "   • Static Test Pages      : http://localhost:$$TEST_PAGES_PORT"
         echo "=================================================================="
     depends_on:
       - api
       - frontend
+      - test-pages
 
 
 
